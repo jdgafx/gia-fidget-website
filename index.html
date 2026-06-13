@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#E8DFF5" />
+  <meta name="description" content="A peaceful fidget playground for Gia — soft light, gentle motion, all the colors of hope." />
+  <title>For Gia</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Inter:wght@300;400;500&display=swap"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js" defer></script>
+</head>
+<body>
+  <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <h1 class="title">For Gia</h1>
+    <p class="prompt" id="prompt">tap a glow below to begin</p>
+  </header>
+
+  <main id="effects-stage" class="effects-stage" aria-label="Effects"></main>
+
+  <nav class="chip-tray" id="chip-tray" aria-label="Add an effect">
+    <div class="chip-tray-inner" id="chip-tray-inner">
+      <button class="chip" data-effect="fluid-goo" type="button" aria-label="Goo Blob">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3c3 0 5 2 5 5 2 0 4 2 4 5s-2 5-5 5c-1 2-3 3-5 3-3 0-5-2-5-5-2 0-4-2-4-5s2-5 4-5c0-3 2-5 5-5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="chip-label">Goo</span>
+      </button>
+      <button class="chip" data-effect="soap-bubble" type="button" aria-label="Soap Bubble">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 9c1.5 1 4 1 6 0M9 14c1 1 3 1 5 0" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </span>
+        <span class="chip-label">Bubble</span>
+      </button>
+      <button class="chip" data-effect="petal-drift" type="button" aria-label="Petal Drift">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 4c2 3 2 5 0 8-2-3-2-5 0-8zM12 12c2 3 2 5 0 8-2-3-2-5 0-8zM4 12c3-2 5-2 8 0-3 2-5 2-8 0zM20 12c-3-2-5-2-8 0 3 2 5 2 8 0z" fill="currentColor" opacity=".7"/></svg>
+        </span>
+        <span class="chip-label">Petals</span>
+      </button>
+      <button class="chip" data-effect="aurora-ribbon" type="button" aria-label="Aurora Ribbon">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M2 12c3-4 6-4 9 0s6 4 9 0M2 17c3-4 6-4 9 0s6 4 9 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="chip-label">Aurora</span>
+      </button>
+      <button class="chip" data-effect="galaxy" type="button" aria-label="Spinning Galaxy">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="6" cy="8" r="1" fill="currentColor" opacity=".7"/><circle cx="18" cy="9" r="1" fill="currentColor" opacity=".7"/><circle cx="7" cy="16" r="1" fill="currentColor" opacity=".7"/><circle cx="17" cy="17" r="1" fill="currentColor" opacity=".7"/><circle cx="12" cy="5" r=".8" fill="currentColor" opacity=".5"/><circle cx="12" cy="19" r=".8" fill="currentColor" opacity=".5"/></svg>
+        </span>
+        <span class="chip-label">Galaxy</span>
+      </button>
+      <button class="chip" data-effect="glow-ripple" type="button" aria-label="Glow Ripple">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".6"/><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1" opacity=".3"/></svg>
+        </span>
+        <span class="chip-label">Ripple</span>
+      </button>
+    </div>
+  </nav>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
