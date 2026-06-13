@@ -30,15 +30,32 @@ export function mountLoveNote(container) {
   const root = container.querySelector('.love-note');
   root.style.setProperty('--speed', String(speed));
 
-  // Visibility: pause the breathing animation when offscreen.
+  // Visibility: pause the parallax loop when offscreen.
   const vis = createVisibilityObserver(container);
   let raf = 0;
+
+  // Pointer parallax: phrase drifts toward the cursor.
+  const target = { x: 0, y: 0 };
+  const cur = { x: 0, y: 0 };
+  function onPointerMove(e) {
+    const r = container.getBoundingClientRect();
+    target.x = ((e.clientX - r.left) / r.width - 0.5) * 2;   // -1..1
+    target.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+  }
+  function onPointerLeave() { target.x = 0; target.y = 0; }
+  container.addEventListener('pointermove', onPointerMove, { passive: true });
+  container.addEventListener('pointerleave', onPointerLeave, { passive: true });
+
   function tick() {
     if (!shouldRender(container, vis)) {
       raf = requestAnimationFrame(tick);
       return;
     }
-    // CSS handles the animation; this loop is just for the vis gate.
+    // Smooth follow.
+    cur.x += (target.x - cur.x) * 0.12;
+    cur.y += (target.y - cur.y) * 0.12;
+    root.style.setProperty('--mx', cur.x.toFixed(3));
+    root.style.setProperty('--my', cur.y.toFixed(3));
     raf = requestAnimationFrame(tick);
   }
   raf = requestAnimationFrame(tick);
@@ -55,6 +72,8 @@ export function mountLoveNote(container) {
     destroy() {
       cancelAnimationFrame(raf);
       vis.destroy();
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerleave', onPointerLeave);
       container.removeEventListener('pointerdown', onPointerDown);
       container.innerHTML = '';
     },

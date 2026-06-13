@@ -29,22 +29,39 @@ export function mountGlowRipple(container) {
   const ripples = []; // { x, y, t, hue }
   let pointerX = 0.5, pointerY = 0.5;
   let pointerInside = false;
-
+  let lastSpawnT = 0;
+  // Spawn on move with throttling — feels like a continuous trail.
+  function spawn(x, y) {
+    if (ripples.length >= MAX_RIPPLES) ripples.shift();
+    const hue = 0.5 + 0.5 * Math.sin(x * 6.28 + y * 4.0);
+    ripples.push({ x, y, t: 0, hue });
+  }
   function onPointerMove(e) {
     const r = wrap.getBoundingClientRect();
-    pointerX = (e.clientX - r.left) / r.width;
-    pointerY = (e.clientY - r.top) / r.height;
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    pointerX = x; pointerY = y;
     pointerInside = true;
+    // Throttle to ~one ripple every 90ms while moving.
+    const now = performance.now();
+    if (now - lastSpawnT > 90) {
+      lastSpawnT = now;
+      spawn(x, y);
+    }
   }
   function onPointerLeave() { pointerInside = false; }
   function onPointerDown(e) {
     const r = wrap.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
     const y = (e.clientY - r.top) / r.height;
-    if (ripples.length >= MAX_RIPPLES) ripples.shift();
-    // Hue biased by pointer's current position (subtle, no hard rainbow).
-    const hue = 0.5 + 0.5 * Math.sin(x * 6.28 + y * 4.0);
-    ripples.push({ x, y, t: 0, hue });
+    spawn(x, y);
+    // Tap also bursts a few extra ripples for feedback.
+    for (let i = 1; i <= 3; i++) {
+      spawn(
+        Math.max(0, Math.min(1, x + (Math.random() - 0.5) * 0.15)),
+        Math.max(0, Math.min(1, y + (Math.random() - 0.5) * 0.15))
+      );
+    }
   }
   wrap.addEventListener('pointermove', onPointerMove, { passive: true });
   wrap.addEventListener('pointerleave', onPointerLeave, { passive: true });

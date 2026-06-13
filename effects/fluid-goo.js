@@ -66,8 +66,11 @@ const FRAG = /* glsl */`
     float blobs = 0.0;
     for (int i = 0; i < 5; i++) {
       float a = float(i) * 1.2566;       // 72° steps
-      float radius = 0.32 + 0.10 * sin(uTime * 0.5 + a);
-      vec2 c = vec2(cos(a + uTime * 0.2), sin(a + uTime * 0.18)) * 0.30;
+      // Blobs follow the pointer with a swirl — the whole cluster
+      // leans toward the cursor.
+      vec2 pOff = uPointerLocal * 0.35;
+      float radius = 0.32 + 0.14 * sin(uTime * 0.9 + a);
+      vec2 c = vec2(cos(a + uTime * 0.45), sin(a + uTime * 0.4)) * 0.34 + pOff;
       float d = length(uv - c) - radius;
       blobs += 0.20 / (d * d * 30.0 + 0.1);
     }
@@ -76,7 +79,8 @@ const FRAG = /* glsl */`
 
     // Pointer proximity brightens a hue band.
     float px = length(uv - uPointerLocal);
-    float prox = smoothstep(0.9, 0.0, px) * uPointerProx;
+    // Bigger, longer reach — the whole blob reacts to nearby cursor.
+    float prox = smoothstep(1.4, 0.0, px) * uPointerProx;
 
     // Vivid rainbow swirl — always alive, brighter on pointer proximity.
     // Spans the full hue wheel so the blob is always colorful.
@@ -188,13 +192,14 @@ export function mountFluidGoo(container) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
 
-    const damp = pointerDamp(dt, 0.45);
+    // Faster pointer damping so the blob really chases the cursor.
+    const damp = pointerDamp(dt, 0.18);
     const cur = uniforms.uPointerLocal.value;
     cur.x += (target.x - cur.x) * damp;
     cur.y += (target.y - cur.y) * damp;
     uniforms.uPointerProx.value += (target.prox - uniforms.uPointerProx.value) * damp;
 
-    bloom *= Math.exp(-dt / 0.6);
+    bloom *= Math.exp(-dt / 0.4);
     uniforms.uBloom.value = bloom;
 
     uniforms.uTime.value = t;

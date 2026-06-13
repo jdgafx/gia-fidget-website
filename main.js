@@ -132,12 +132,17 @@ function makeCard(effectKey) {
   // Make draggable.
   const drag = makeDraggable(card, handle);
 
+  // 3D mouse tilt — tracks pointer over the card, gives subtle
+  // perspective tilt + a tiny lift. Disabled while dragging.
+  const tilt = attachTilt(card);
+
   // Close.
   close.addEventListener('click', () => {
     card.classList.add('closing');
     setTimeout(() => {
       try { card._instance && card._instance.destroy && card._instance.destroy(); } catch {}
       drag.destroy();
+      tilt.destroy();
       card.remove();
     }, 380);
   });
@@ -159,6 +164,58 @@ tray.addEventListener('click', e => {
   const key = chip.dataset.effect;
   makeCard(key);
 });
+
+// ---------- 3D mouse tilt on every card ----------
+
+function attachTilt(card) {
+  const TILT_MAX = 12;       // degrees
+  const LIFT_MAX = 6;        // px
+  const DAMP = 0.18;         // 0..1
+  let tgtX = 0, tgtY = 0, tgtLift = 0;
+  let curX = 0, curY = 0, curLift = 0;
+  let hovering = false;
+  let raf = 0;
+  let lastMoveT = 0;
+
+  function onMove(e) {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    tgtY  = (x - 0.5) * TILT_MAX * 2;          // ±TILT_MAX
+    tgtX  = (0.5 - y) * TILT_MAX * 2;          // ±TILT_MAX
+    tgtLift = -LIFT_MAX;                       // float up while hovered
+    hovering = true;
+    lastMoveT = performance.now();
+  }
+  function onLeave() {
+    tgtX = 0; tgtY = 0; tgtLift = 0;
+    hovering = false;
+  }
+
+  card.addEventListener('pointermove', onMove, { passive: true });
+  card.addEventListener('pointerenter', onMove, { passive: true });
+  card.addEventListener('pointerleave', onLeave, { passive: true });
+
+  function tick() {
+    curX    += (tgtX - curX) * DAMP;
+    curY    += (tgtY - curY) * DAMP;
+    curLift += (tgtLift - curLift) * DAMP;
+    card.style.setProperty('--tilt-x', `${curX.toFixed(2)}deg`);
+    card.style.setProperty('--tilt-y', `${curY.toFixed(2)}deg`);
+    card.style.setProperty('--lift-y', `${curLift.toFixed(2)}px`);
+    raf = requestAnimationFrame(tick);
+  }
+  raf = requestAnimationFrame(tick);
+
+  return {
+    destroy() {
+      cancelAnimationFrame(raf);
+      card.removeEventListener('pointermove', onMove);
+      card.removeEventListener('pointerenter', onMove);
+      card.removeEventListener('pointerleave', onLeave);
+    },
+  };
+}
 
 // ---------- Hide tray scroll shadow on overflow ----------
 

@@ -100,15 +100,26 @@ export function mountSoapBubble(container) {
   let fade = 0;
   let spawn = 0;
   let drift = 0;
-  const driftAmp = 0.10;
-  const driftPeriod = 8.0;
+  const driftAmp = 0.18;
+  const driftPeriod = 6.0;
+  // Mouse follow (bubble drifts toward pointer when hovered).
+  const target = { x: 0, y: 0 };
+  const cur = { x: 0, y: 0 };
 
+  function onPointerMove(e) {
+    const r = canvas.getBoundingClientRect();
+    target.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    target.y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+  }
+  function onPointerLeave() { target.x = 0; target.y = 0; }
   function onPointerDown() {
     if (phase === 'idle' || phase === 'appearing') {
       phase = 'dissolving';
       phaseT = 0;
     }
   }
+  canvas.addEventListener('pointermove', onPointerMove, { passive: true });
+  canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
   canvas.addEventListener('pointerdown', onPointerDown, { passive: true });
 
   function resize() {
@@ -143,6 +154,10 @@ export function mountSoapBubble(container) {
       spawn *= Math.exp(-dt / 0.3);
       fade = 1;
       drift = Math.sin(t * (2 * Math.PI / driftPeriod)) * driftAmp;
+      // Mouse follow with strong damping.
+      const damp = 1 - Math.exp(-dt / 0.2);
+      cur.x += (target.x - cur.x) * damp;
+      cur.y += (target.y - cur.y) * damp;
     } else if (phase === 'dissolving') {
       fade = Math.max(0, 1 - phaseT / 1.2);
       spawn = 0;
@@ -157,9 +172,11 @@ export function mountSoapBubble(container) {
       }
     }
 
-    mesh.position.y = drift;
-    mesh.rotation.y = t * 0.15;
-    mesh.rotation.x = Math.sin(t * 0.2) * 0.1;
+    mesh.position.x = cur.x * 0.6;
+    mesh.position.y = drift + cur.y * 0.6;
+    mesh.rotation.y = t * 0.25;
+    mesh.rotation.x = Math.sin(t * 0.3) * 0.15;
+    mesh.scale.setScalar(0.95 + 0.08 * Math.sin(t * 0.9));
 
     uniforms.uTime.value = t;
     uniforms.uFade.value = fade;

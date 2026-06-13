@@ -168,8 +168,8 @@ export function mountGalaxy(container) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
 
-    // Auto-rotation: very slow, like a clock minute hand.
-    const autoY = 0.05 * dt;
+    // Auto-rotation: faster so it feels alive, but still graceful.
+    const autoY = 0.18 * dt;
     // Drag-driven spin decays over 4s.
     const decay = Math.exp(-dt / 0.8);
     rotY += dragDeltaX + autoY;

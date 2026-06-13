@@ -83,8 +83,8 @@ const FRAG = /* glsl */`
     vec2 p = uv * 2.0 - 1.0;
     p.x *= uResolution.x / uResolution.y;
 
-    // Pointer bias: pull the noise field slightly toward the pointer.
-    vec2 ptr = uPointer * 0.5 * uPointerEased;
+    // Pointer bias: pull the noise field strongly toward the pointer.
+    vec2 ptr = uPointer * 1.1 * uPointerEased;
     p += ptr;
 
     // Slow scroll to make the noise drift.
@@ -203,15 +203,17 @@ export function mountBackground(canvas) {
     const t = clock.elapsedTime;
 
     uniforms.uTime.value = t * speed;
-    uniforms.uHueShift.value = (t * speed * 0.018) % 1.0;
+    // Faster hue cycle so the room feels alive.
+    uniforms.uHueShift.value = (t * speed * 0.045) % 1.0;
 
-    // Pointer ease.
-    const damp = 1 - Math.exp(-dt / 0.6);
+    // Pointer ease — faster response.
+    const damp = 1 - Math.exp(-dt / 0.25);
     const cur = uniforms.uPointer.value;
     cur.x += (pointerTargetX - cur.x) * damp;
     cur.y += (pointerTargetY - cur.y) * damp;
     pointerEased += (pointerActive - pointerEased) * damp;
-    uniforms.uPointerEased.value = pointerEased;
+    // Bigger pointer bias so the room really leans toward the cursor.
+    uniforms.uPointerEased.value = pointerEased * 1.8;
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
