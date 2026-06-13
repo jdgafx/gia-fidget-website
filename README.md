@@ -103,6 +103,15 @@ the repo in the Netlify dashboard.
     └── draggable.js        Pointer-Events draggable wrapper
 ```
 
+## Auto-deploy
+
+Every push to `master` automatically deploys to Netlify via a `post-push` git hook in `.git/hooks/post-push`. The hook reads `~/.netlifyrc` (mode 0600) for the auth token + site ID.
+
+To disable auto-deploy for a single push, use `git push --no-verify` (no — that bypasses other hooks) or temporarily rename the hook:
+```bash
+mv .git/hooks/post-push .git/hooks/post-push.disabled
+```
+
 ## Credits
 
 Made for Gia, from Dad. With love, soft light, and a long, slow exhale.
