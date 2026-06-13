@@ -11,25 +11,31 @@ import { mountPetalDrift }   from './effects/petal-drift.js';
 import { mountAuroraRibbon } from './effects/aurora-ribbon.js';
 import { mountGalaxy }       from './effects/galaxy.js';
 import { mountGlowRipple }   from './effects/glow-ripple.js';
+import { mountLoveNote }     from './effects/love-note.js';
+import { mountNeverGiveUp }  from './effects/never-give-up.js';
 import { makeDraggable }     from './lib/draggable.js';
 import { isDocumentVisible } from './lib/visibility.js';
 
 const EFFECT_LABELS = {
-  'fluid-goo':    'Goo',
-  'soap-bubble':  'Bubble',
-  'petal-drift':  'Petals',
-  'aurora-ribbon':'Aurora',
-  'galaxy':       'Galaxy',
-  'glow-ripple':  'Ripple',
+  'fluid-goo':     'Goo',
+  'soap-bubble':   'Bubble',
+  'petal-drift':   'Petals',
+  'aurora-ribbon': 'Aurora',
+  'galaxy':        'Galaxy',
+  'glow-ripple':   'Ripple',
+  'love-note':     'Love',
+  'never-give-up': 'Hope',
 };
 
 const EFFECT_MOUNT = {
-  'fluid-goo':    mountFluidGoo,
-  'soap-bubble':  mountSoapBubble,
-  'petal-drift':  mountPetalDrift,
-  'aurora-ribbon':mountAuroraRibbon,
-  'galaxy':       mountGalaxy,
-  'glow-ripple':  mountGlowRipple,
+  'fluid-goo':     mountFluidGoo,
+  'soap-bubble':   mountSoapBubble,
+  'petal-drift':   mountPetalDrift,
+  'aurora-ribbon': mountAuroraRibbon,
+  'galaxy':        mountGalaxy,
+  'glow-ripple':   mountGlowRipple,
+  'love-note':     mountLoveNote,
+  'never-give-up': mountNeverGiveUp,
 };
 
 // ---------- Ambient background ----------
@@ -56,7 +62,7 @@ const stage = document.getElementById('effects-stage');
 const tray = document.getElementById('chip-tray-inner');
 let cardIndex = 0;
 
-// Viewport-aware grid spawn: 2x3 on mobile, 3x2 on desktop.
+// Viewport-aware grid spawn: 2x4 on mobile, 4x2 on desktop (8 slots).
 // Cards never overlap because each spawn picks the next free cell.
 function nextSpawnPosition() {
   const vw = window.innerWidth;
@@ -64,10 +70,10 @@ function nextSpawnPosition() {
   const isMobile = vw < 768;
   const margin = 12;
   const headerH = 90;
-  const trayH = 100;
+  const trayH = 110; // taller tray now that 2 word chips share it
 
-  const cols = isMobile ? 2 : 3;
-  const rows = isMobile ? 3 : 2;
+  const cols = isMobile ? 2 : 4;
+  const rows = isMobile ? 4 : 2;
 
   // Card size fits the grid minus margins.
   const cardW = Math.floor((vw - margin * (cols + 1)) / cols);

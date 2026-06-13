@@ -1,26 +1,53 @@
 /* ============================================================
    For Gia — fidget playground styles
-   Mobile-first, desktop-equal. Calm by default.
+   DARK MODE — Apple.com-inspired. Deep plum/indigo base, glass
+   cards, high-contrast rainbow accents. Mobile-first, desktop-equal.
    ============================================================ */
 
 :root {
-  /* Hope palette — dawn pastels (parasympathetic-friendly) */
-  --peach:    #ffe5d9;
-  --lavender: #e8dff5;
-  --mint:     #d4f1e4;
-  --sky:      #dceefb;
-  --rose:     #fde2e4;
-  --ink:      #2a2540;       /* soft dark plum, not pure black */
-  --ink-soft: #5a5475;
-  --paper:    #fbf8f3;       /* off-white, warm */
-  --glass:    rgba(255, 255, 255, 0.55);
-  --glass-strong: rgba(255, 255, 255, 0.78);
-  --shadow:   0 18px 48px -18px rgba(60, 50, 90, 0.25),
-              0 2px 6px -2px rgba(60, 50, 90, 0.10);
-  --radius:   18px;
-  --radius-sm: 12px;
-  --tray-h:   84px;
-  --header-h: 0px;
+  /* Dark base — deep plum/indigo, never pure black */
+  --bg-deep:    #07050f;
+  --bg-1:       #0e0a1d;
+  --bg-2:       #15102a;
+  --bg-3:       #1d1640;
+
+  /* Glass */
+  --glass:        rgba(255, 255, 255, 0.04);
+  --glass-strong: rgba(255, 255, 255, 0.08);
+  --border:       rgba(255, 255, 255, 0.08);
+  --border-hi:    rgba(255, 255, 255, 0.16);
+
+  /* Ink */
+  --ink:       #f0eaff;
+  --ink-soft:  #b8b0d0;
+  --ink-dim:   #6b6580;
+
+  /* Vibrant accents (high contrast on dark) */
+  --rose:    #ff6b9d;
+  --violet:  #a78bfa;
+  --blue:    #60a5fa;
+  --teal:    #34d3c5;
+  --lime:    #a3e635;
+  --gold:    #fbbf24;
+  --magenta: #e879f9;
+
+  /* Hope-rainbow gradient (used for hero text) */
+  --rainbow: linear-gradient(110deg,
+    hsl(340 85% 70%),
+    hsl(290 80% 72%),
+    hsl(245 80% 72%),
+    hsl(200 85% 70%),
+    hsl(160 75% 65%),
+    hsl(45 90% 65%),
+    hsl(340 85% 70%)
+  );
+
+  --radius:    20px;
+  --radius-sm: 14px;
+  --shadow:    0 24px 60px -20px rgba(0, 0, 0, 0.65),
+               0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-hi: 0 32px 80px -24px rgba(167, 139, 250, 0.35),
+               0 1px 0 rgba(255, 255, 255, 0.08) inset;
   --transition: 480ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -32,7 +59,7 @@ html, body {
   height: 100%;
   width: 100%;
   overflow-x: hidden;
-  background: var(--paper);
+  background: var(--bg-deep);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-weight: 300;
@@ -47,18 +74,11 @@ body {
   min-height: 100dvh;
   position: relative;
   background:
-    radial-gradient(120% 80% at 20% 10%, var(--peach) 0%, transparent 60%),
-    radial-gradient(120% 80% at 80% 30%, var(--lavender) 0%, transparent 60%),
-    radial-gradient(120% 80% at 50% 90%, var(--mint) 0%, transparent 60%),
-    var(--paper);
+    radial-gradient(120% 80% at 20% 10%, rgba(167, 139, 250, 0.12) 0%, transparent 60%),
+    radial-gradient(120% 80% at 80% 30%, rgba(96, 165, 250, 0.10) 0%, transparent 60%),
+    radial-gradient(120% 80% at 50% 90%, rgba(232, 121, 249, 0.08) 0%, transparent 60%),
+    var(--bg-deep);
   background-attachment: fixed;
-  animation: ambientDrift 60s ease-in-out infinite alternate;
-}
-
-@keyframes ambientDrift {
-  0%   { filter: hue-rotate(0deg)   saturate(1.0); }
-  50%  { filter: hue-rotate(8deg)   saturate(1.05); }
-  100% { filter: hue-rotate(-6deg)  saturate(0.98); }
 }
 
 /* ---------- WebGL ambient canvas ---------- */
@@ -70,8 +90,8 @@ body {
   height: 100dvh;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.85;
-  mix-blend-mode: soft-light;
+  opacity: 0.55;
+  mix-blend-mode: screen;
 }
 
 .vignette {
@@ -79,7 +99,8 @@ body {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(80, 60, 110, 0.10) 100%);
+  background:
+    radial-gradient(120% 80% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.55) 100%);
 }
 
 /* ---------- Header ---------- */
@@ -90,7 +111,7 @@ body {
   left: 0;
   right: 0;
   z-index: 10;
-  padding: calc(env(safe-area-inset-top, 0px) + 18px) 20px 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px 14px;
   text-align: center;
   pointer-events: none;
   user-select: none;
@@ -98,14 +119,25 @@ body {
 
 .title {
   font-family: 'Cormorant Garamond', 'Times New Roman', serif;
-  font-weight: 400;
+  font-weight: 500;
   font-style: italic;
-  font-size: clamp(28px, 6vw, 44px);
-  line-height: 1.1;
+  font-size: clamp(34px, 8vw, 64px);
+  line-height: 1.0;
   margin: 0;
-  color: var(--ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  letter-spacing: 0.02em;
+  background: var(--rainbow);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.01em;
+  animation: titleFlow 16s linear infinite;
+  filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.25));
+}
+
+@keyframes titleFlow {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 300% 50%; }
 }
 
 .prompt {
@@ -113,15 +145,16 @@ body {
   font-weight: 300;
   font-size: clamp(12px, 2.6vw, 14px);
   color: var(--ink-soft);
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   opacity: 0;
   transform: translateY(-4px);
   transition: opacity 1.6s ease, transform 1.6s ease;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .prompt.show {
-  opacity: 0.85;
+  opacity: 0.75;
   transform: translateY(0);
 }
 
@@ -138,7 +171,7 @@ body {
   z-index: 5;
   min-height: 100dvh;
   width: 100%;
-  pointer-events: none; /* let canvas be hit, but cards override */
+  pointer-events: none;
 }
 
 /* ---------- Effect card ---------- */
@@ -146,9 +179,9 @@ body {
 .effect-card {
   position: absolute;
   background: var(--glass);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -156,8 +189,11 @@ body {
   flex-direction: column;
   pointer-events: auto;
   opacity: 0;
-  transform: scale(0.92) translateY(8px);
-  transition: opacity 420ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: scale(0.94) translateY(10px);
+  transition: opacity 480ms ease,
+              transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              box-shadow 600ms ease,
+              border-color 600ms ease;
   will-change: transform, opacity;
   touch-action: none;
 }
@@ -167,9 +203,14 @@ body {
   transform: scale(1) translateY(0);
 }
 
+.effect-card:hover {
+  box-shadow: var(--shadow-hi);
+  border-color: var(--border-hi);
+}
+
 .effect-card.closing {
   opacity: 0;
-  transform: scale(0.94) translateY(6px);
+  transform: scale(0.94) translateY(8px);
   transition: opacity 360ms ease, transform 360ms ease;
 }
 
@@ -179,24 +220,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 0 16px;
+  padding: 0 8px 0 18px;
   cursor: grab;
   user-select: none;
   touch-action: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.1));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.0));
+  border-bottom: 1px solid var(--border);
 }
 
 .effect-handle:active { cursor: grabbing; }
 
 .effect-handle-title {
   font-family: 'Inter', sans-serif;
-  font-weight: 400;
-  font-size: 13px;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
   color: var(--ink-soft);
   pointer-events: none;
+  background: var(--rainbow);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: titleFlow 12s linear infinite;
 }
 
 .effect-close {
@@ -210,22 +258,33 @@ body {
   color: var(--ink-soft);
   cursor: pointer;
   border-radius: 50%;
-  transition: background 200ms ease, color 200ms ease;
+  transition: background 200ms ease, color 200ms ease, transform 200ms ease;
   font-family: inherit;
+  position: relative;
+  z-index: 2;
+  touch-action: manipulation;
 }
 
 .effect-close:hover,
 .effect-close:focus-visible {
-  background: rgba(90, 84, 117, 0.10);
-  color: var(--ink);
+  background: rgba(255, 107, 157, 0.18);
+  color: var(--rose);
   outline: none;
+  transform: scale(1.08);
+}
+
+.effect-close:active {
+  transform: scale(0.94);
 }
 
 .effect-canvas {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(255, 229, 217, 0.5), rgba(216, 238, 251, 0.5));
+  background:
+    radial-gradient(60% 50% at 30% 30%, rgba(167, 139, 250, 0.10), transparent 60%),
+    radial-gradient(60% 50% at 70% 70%, rgba(96, 165, 250, 0.08), transparent 60%),
+    var(--bg-1);
   touch-action: none;
 }
 
@@ -243,10 +302,10 @@ body {
   right: 0;
   bottom: 0;
   z-index: 20;
-  padding: 10px 0 calc(env(safe-area-inset-bottom, 0px) + 10px);
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5) 30%, rgba(255, 255, 255, 0.85));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: linear-gradient(180deg, transparent, rgba(7, 5, 15, 0.6) 30%, rgba(7, 5, 15, 0.95));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   pointer-events: none;
 }
 
@@ -260,6 +319,7 @@ body {
   pointer-events: auto;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  align-items: center;
 }
 
 .chip-tray-inner::-webkit-scrollbar { display: none; }
@@ -272,29 +332,34 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-hi);
   background: var(--glass-strong);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: var(--radius-sm);
   color: var(--ink);
   font-family: inherit;
   font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 4px 12px -4px rgba(60, 50, 90, 0.15);
-  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1), background 220ms ease, box-shadow 220ms ease;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4);
+  transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              background 240ms ease,
+              box-shadow 240ms ease,
+              border-color 240ms ease;
   scroll-snap-align: center;
 }
 
 .chip:hover,
 .chip:focus-visible {
-  background: white;
+  background: rgba(255, 255, 255, 0.10);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px -6px rgba(60, 50, 90, 0.22);
+  box-shadow: 0 10px 24px -8px rgba(167, 139, 250, 0.40);
+  border-color: rgba(167, 139, 250, 0.35);
   outline: none;
 }
 
@@ -310,9 +375,27 @@ body {
 
 .chip-label {
   font-size: 10px;
-  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--ink-soft);
-  letter-spacing: 0.10em;
+}
+
+.chip-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  align-self: stretch;
+  margin: 8px 4px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+}
+
+.chip-word .chip-icon { color: var(--rose); }
+.chip-word .chip-label {
+  background: var(--rainbow);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: titleFlow 10s linear infinite;
 }
 
 /* ---------- Desktop layout tweaks ---------- */
@@ -328,23 +411,269 @@ body {
 /* ---------- prefers-reduced-motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  body {
-    animation-duration: 180s;
-  }
   .prompt {
     transition-duration: 2400ms;
   }
   .effect-card {
     transition-duration: 600ms;
   }
-  * {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+  .title,
+  .effect-handle-title,
+  .chip-word .chip-label {
+    animation-duration: 30s;
   }
 }
 
-/* ---------- prefers-reduced-motion (calm fallback) ----------
-   We keep slow ambient motion but reduce particle/burst activity
-   inside each effect module. The CSS rule above is intentionally
-   permissive so the room still breathes. */
+/* ============================================================
+   Love note ("I Love You, Dad :) :)")
+   ============================================================ */
+
+.love-note {
+  --speed: 1;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  background:
+    radial-gradient(70% 60% at 50% 35%, rgba(255, 107, 157, 0.18), transparent 70%),
+    radial-gradient(60% 50% at 50% 75%, rgba(167, 139, 250, 0.14), transparent 70%);
+  overflow: hidden;
+  animation: loveFloat 7s ease-in-out infinite;
+  animation-duration: calc(7s / var(--speed));
+}
+
+@keyframes loveFloat {
+  0%, 100% { transform: translateY(-3px); }
+  50%      { transform: translateY( 3px); }
+}
+
+.love-note-phrase {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+  font-weight: 500;
+  font-style: italic;
+  font-size: clamp(20px, 5.5vw, 36px);
+  line-height: 1.1;
+  text-align: center;
+  color: #ffeaf0;
+  text-shadow: 0 0 16px rgba(255, 107, 157, 0.35);
+}
+
+.love-word {
+  display: inline-block;
+  color: #ffeaf0;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: loveWordIn 900ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: calc(120ms * var(--i) / var(--speed));
+}
+
+@keyframes loveWordIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.love-smileys {
+  display: flex;
+  gap: 18px;
+  font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(28px, 8vw, 48px);
+  line-height: 1;
+}
+
+.love-smiley {
+  display: inline-block;
+  opacity: 0;
+  background: linear-gradient(120deg,
+    hsl(340 90% 75%),
+    hsl(290 85% 78%),
+    hsl(245 85% 80%),
+    hsl(200 85% 78%),
+    hsl(340 90% 75%)
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(255, 107, 157, 0.4));
+  animation:
+    loveWordIn 700ms ease-out forwards,
+    loveBreath 4s ease-in-out infinite,
+    loveShimmer 8s linear infinite;
+  animation-delay:
+    calc(600ms + 200ms * var(--i) / var(--speed)),
+    calc(1.4s + 400ms * var(--i) / var(--speed)),
+    0s;
+}
+
+@keyframes loveBreath {
+  0%, 100% { transform: scale(1.0); }
+  50%      { transform: scale(1.14); }
+}
+
+@keyframes loveShimmer {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+.love-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 40% at 50% 55%, rgba(255, 107, 157, 0.18), transparent 70%);
+  animation: loveShimmerBg 12s ease-in-out infinite;
+}
+
+@keyframes loveShimmerBg {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+
+.love-tap .love-smiley {
+  animation:
+    loveWordIn 700ms ease-out forwards,
+    loveBreath 4s ease-in-out infinite,
+    loveShimmer 8s linear infinite,
+    loveTap 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes loveTap {
+  0%   { transform: scale(1.0); filter: drop-shadow(0 0 0 rgba(255, 150, 180, 0)); }
+  35%  { transform: scale(1.40); filter: drop-shadow(0 0 24px rgba(255, 150, 180, 0.85)); }
+  100% { transform: scale(1.0); filter: drop-shadow(0 0 0 rgba(255, 150, 180, 0)); }
+}
+
+/* ============================================================
+   Never Give Up
+   ============================================================ */
+
+.ng {
+  --speed: 1;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  background:
+    radial-gradient(70% 60% at 50% 30%, rgba(96, 165, 250, 0.18), transparent 70%),
+    radial-gradient(60% 50% at 50% 80%, rgba(52, 211, 197, 0.12), transparent 70%);
+  overflow: hidden;
+}
+
+.ng-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(40% 30% at 50% 60%, rgba(255, 230, 200, 0.15), transparent 70%);
+  animation: ngGlow 9s ease-in-out infinite;
+}
+
+@keyframes ngGlow {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.9; }
+}
+
+.ng-line {
+  display: flex;
+  font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+  font-weight: 500;
+  font-style: italic;
+  font-size: clamp(28px, 7.5vw, 50px);
+  line-height: 1.0;
+  text-align: center;
+  filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.25));
+}
+
+.ng-line-1 { letter-spacing: 0.04em; }
+.ng-line-2 { letter-spacing: 0.02em; }
+
+.ng-letter {
+  display: inline-block;
+  background: linear-gradient(110deg,
+    hsl(340 85% 72%),
+    hsl(290 80% 75%),
+    hsl(245 85% 78%),
+    hsl(200 85% 75%),
+    hsl(160 75% 70%),
+    hsl(45 90% 70%),
+    hsl(340 85% 72%)
+  );
+  background-size: 400% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  opacity: 0;
+  transform: translateY(10px);
+  animation:
+    ngIn 700ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards,
+    ngFlow 10s linear infinite;
+  animation-delay:
+    calc(80ms * var(--i) / var(--speed)),
+    0s;
+}
+
+@keyframes ngIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ngFlow {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 400% 50%; }
+}
+
+.ng-space { display: inline-block; width: 0.4em; }
+
+.ng-underline {
+  position: relative;
+  width: 70%;
+  max-width: 240px;
+  height: 3px;
+  margin-top: 14px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+}
+
+.ng-underline-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: linear-gradient(90deg,
+    hsl(340 85% 72%),
+    hsl(290 80% 75%),
+    hsl(245 85% 78%),
+    hsl(200 85% 75%),
+    hsl(160 75% 70%),
+    hsl(45 90% 70%),
+    hsl(340 85% 72%)
+  );
+  background-size: 200% 100%;
+  animation: ngDraw 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-duration: calc(6s / var(--speed));
+}
+
+@keyframes ngDraw {
+  0%   { width: 0%;   background-position:   0% 50%; }
+  60%  { width: 100%; background-position: 100% 50%; }
+  80%  { width: 100%; background-position: 100% 50%; }
+  100% { width: 0%;   background-position:   0% 50%; opacity: 0; }
+}
+
+.ng-redraw {
+  animation: ngDraw 6s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+  animation-duration: calc(1.5s / var(--speed)) !important;
+}

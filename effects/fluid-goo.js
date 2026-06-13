@@ -78,34 +78,39 @@ const FRAG = /* glsl */`
     float px = length(uv - uPointerLocal);
     float prox = smoothstep(0.9, 0.0, px) * uPointerProx;
 
-    // Rainbow swirl phase: tied to angle and time, more visible on prox.
+    // Vivid rainbow swirl — always alive, brighter on pointer proximity.
+    // Spans the full hue wheel so the blob is always colorful.
     float ang = atan(uv.y, uv.x);
-    float hue = fract(0.5 + ang / 6.28318 + uTime * 0.04);
-    vec3 rainbow = hsl2rgb(vec3(hue, 0.70, 0.65));
+    float hue = fract(0.5 + ang / 6.28318 + uTime * 0.10);
 
-    // Pastel base.
+    // Bright saturated base (was pastel peach/lavender — too washed out on dark).
     vec3 base = mix(
-      vec3(1.0, 0.90, 0.85),   // peach
-      vec3(0.91, 0.87, 0.96),  // lavender
+      vec3(0.95, 0.30, 0.55),   // hot pink
+      vec3(0.55, 0.30, 0.95),   // electric violet
       0.5 + 0.5 * sin(uTime * 0.3)
     );
 
-    vec3 col = base;
-    col = mix(col, rainbow, prox * 0.7);
+    vec3 rainbow = hsl2rgb(vec3(hue, 0.90, 0.65));
 
-    // Tap bloom — a soft inner glow that decays.
-    col += vec3(1.0, 0.95, 0.92) * uBloom * 0.5;
-    col += rainbow * uBloom * 0.25;
+    vec3 col = mix(base, rainbow, 0.45 + prox * 0.55);
+
+    // Tap bloom — a bright inner glow that decays.
+    col += rainbow * uBloom * 0.6;
+    col += vec3(1.0) * uBloom * 0.3;
 
     // Subtle breath tint.
-    col *= 0.96 + 0.05 * uBreath;
+    col *= 0.95 + 0.08 * uBreath;
+
+    // Soft outer glow halo — gives the blob presence on dark.
+    float halo = smoothstep(1.1, 0.3, length(uv));
+    col += rainbow * halo * 0.10;
 
     // Edge softness — fade out around the quad.
-    float edge = smoothstep(1.2, 0.6, length(uv));
+    float edge = smoothstep(1.2, 0.5, length(uv));
     col *= edge;
 
-    // Subtle highlight where pointer is closest.
-    col += vec3(1.0) * prox * 0.15 * (1.0 - smoothstep(0.0, 0.6, px));
+    // Bright highlight where pointer is closest.
+    col += rainbow * prox * 0.25 * (1.0 - smoothstep(0.0, 0.6, px));
 
     gl_FragColor = vec4(col, mask);
   }
