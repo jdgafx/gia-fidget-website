@@ -112,6 +112,8 @@ To disable auto-deploy for a single push, use `git push --no-verify` (no — tha
 mv .git/hooks/post-push .git/hooks/post-push.disabled
 ```
 
+Last verified deploy: see git log for the most recent master commit.
+
 ## Credits
 
 Made for Gia, from Dad. With love, soft light, and a long, slow exhale.
