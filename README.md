@@ -2,6 +2,8 @@
 
 A peaceful fidget playground — soft light, gentle motion, all the colors of hope.
 
+**Live at:** https://gia-fidget-website.netlify.app
+
 Tap any glow at the bottom to add a new companion. Drag the title bar to move it.
 Tap a glow to bloom, drift, ripple, or pop. Close with the **×**.
 
