@@ -93,18 +93,18 @@ const FRAG = /* glsl */`
     // The fluid field.
     float f = warpedFbm(p * 1.1, t);
 
-    // Hue cycle: peach (16°) → lavender (265°) → mint (144°) → sky (208°).
-    // We pick a 3-stop blend based on a slow cosine.
+    // Aurora/nebula hue cycle. Saturated jewel tones for a vivid dark
+    // sky: deep magenta → violet → blue → teal → emerald.
     float a = 0.5 + 0.5 * sin(uHueShift * 6.28318);
     float b = 0.5 + 0.5 * sin(uHueShift * 6.28318 + 2.094); // 120°
-    // Pastel angles (hue degrees / 360).
-    float h1 = mix(16.0/360.0, 265.0/360.0, a);
-    float h2 = mix(265.0/360.0, 144.0/360.0, b);
-    float h3 = mix(144.0/360.0, 208.0/360.0, 1.0 - b);
+    float h1 = mix(310.0/360.0, 265.0/360.0, a);  // magenta ↔ violet
+    float h2 = mix(265.0/360.0, 200.0/360.0, b);  // violet  ↔ blue
+    float h3 = mix(200.0/360.0, 165.0/360.0, 1.0 - b); // blue ↔ teal
 
-    vec3 c1 = hsl2rgb(vec3(h1, 0.50, 0.88));  // peach ↔ lavender
-    vec3 c2 = hsl2rgb(vec3(h2, 0.40, 0.90));  // lavender ↔ mint
-    vec3 c3 = hsl2rgb(vec3(h3, 0.45, 0.91));  // mint   ↔ sky
+    // Saturated, high-lightness so the colors POP against the deep bg.
+    vec3 c1 = hsl2rgb(vec3(h1, 0.75, 0.55));
+    vec3 c2 = hsl2rgb(vec3(h2, 0.75, 0.55));
+    vec3 c3 = hsl2rgb(vec3(h3, 0.70, 0.50));
 
     // Soft mix by the fluid field, with the three colors weighted by
     // its value at three offsets for a layered look.
@@ -114,15 +114,20 @@ const FRAG = /* glsl */`
 
     vec3 col = mix(c1, c2, k1);
     col = mix(col, c3, k2 * 0.6);
-    col = mix(col, c1 * 1.03, k3 * 0.3);
+    col = mix(col, c1 * 0.9, k3 * 0.3);
 
-    // Soft vignette + paper warmth.
+    // Deep dark base — multiply toward black so unlit regions are
+    // almost-black plum, not bright pastels. The colors only emerge
+    // where the fluid field is high.
+    vec3 deep = vec3(0.03, 0.02, 0.06);
+    col = mix(deep, col, 0.55 + 0.45 * f);
+
+    // Soft vignette pulling toward black.
     float vig = smoothstep(1.4, 0.2, length(uv - 0.5) * 1.3);
-    col *= mix(0.92, 1.0, vig);
-    col = mix(col, col + vec3(0.02, 0.01, 0.0), 0.5);
+    col *= mix(0.55, 1.0, vig);
 
     // Gentle global brightness breathing.
-    col *= 0.98 + 0.04 * sin(uTime * 0.5);
+    col *= 0.95 + 0.08 * sin(uTime * 0.5);
 
     gl_FragColor = vec4(col, 1.0);
   }

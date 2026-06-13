@@ -1,80 +1,166 @@
-// effects/petal-drift.js — tsparticles slow-falling petals.
-// 50-80 particles, downward + gentle horizontal sway. Pointer near
-// the canvas adds a soft repulsion (300ms ease-in-out return).
-// Soft hope-pastel palette.
+// effects/petal-drift.js — Custom canvas petals.
+// Slow-falling vivid petals with gentle horizontal sway, soft pointer
+// repulsion, breath-rhythm. Pure canvas2d (no library).
+
+import { prefersReducedMotion } from '../lib/reduced-motion.js';
+import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
+
+const COLORS = [
+  [255, 107, 157], // rose
+  [167, 139, 250], // violet
+  [ 96, 165, 250], // blue
+  [ 52, 211, 197], // teal
+  [163, 230,  53], // lime
+  [251, 191,  36], // gold
+  [232, 121, 249], // magenta
+];
+
+class Petal {
+  constructor(w, h) {
+    this.reset(w, h, true);
+  }
+  reset(w, h, init = false) {
+    this.x = Math.random() * w;
+    this.y = init ? Math.random() * h : -10 - Math.random() * 40;
+    this.size = 4 + Math.random() * 8;
+    this.vy = 0.25 + Math.random() * 0.55;
+    this.vx = (Math.random() - 0.5) * 0.25;
+    this.rot = Math.random() * Math.PI * 2;
+    this.vrot = (Math.random() - 0.5) * 0.04;
+    this.swayPhase = Math.random() * Math.PI * 2;
+    this.swaySpeed = 0.4 + Math.random() * 0.5;
+    this.swayAmp = 0.4 + Math.random() * 0.6;
+    this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    this.alpha = 0.6 + Math.random() * 0.35;
+  }
+  update(dt, t, w, h) {
+    // Sway
+    const sway = Math.sin(t * this.swaySpeed + this.swayPhase) * this.swayAmp;
+    this.x += (this.vx + sway * 0.4) * dt * 60;
+    this.y += this.vy * dt * 60;
+    this.rot += this.vrot * dt * 60;
+    if (this.y > h + 20 || this.x < -20 || this.x > w + 20) this.reset(w, h);
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    ctx.globalAlpha = this.alpha;
+    // Petal shape: an ellipse with a soft inner highlight
+    const r = this.size;
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    grad.addColorStop(0,   `rgba(${this.color[0]},${this.color[1]},${this.color[2]},1)`);
+    grad.addColorStop(0.6, `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0.6)`);
+    grad.addColorStop(1,   `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Glow
+    ctx.globalAlpha = this.alpha * 0.5;
+    ctx.shadowColor = `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0.8)`;
+    ctx.shadowBlur = r * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.5, r * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
 
 export function mountPetalDrift(container) {
-  if (!window.tsParticles) {
-    // Library not loaded yet — defer.
-    return new Promise(resolve => {
-      const id = setInterval(() => {
-        if (window.tsParticles) {
-          clearInterval(id);
-          resolve(mountPetalDrift(container));
-        }
-      }, 100);
-      setTimeout(() => clearInterval(id), 5000);
-    });
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+  container.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const reduced = prefersReducedMotion();
+  const COUNT = reduced ? 35 : 80;
+
+  const petals = [];
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const vis = createVisibilityObserver(canvas);
+
+  // Pointer repulsion state.
+  const ptr = { x: 0, y: 0, inside: false };
+
+  function onPointerMove(e) {
+    const r = canvas.getBoundingClientRect();
+    ptr.x = e.clientX - r.left;
+    ptr.y = e.clientY - r.top;
+    ptr.inside = true;
   }
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function onPointerLeave() { ptr.inside = false; }
+  canvas.addEventListener('pointermove', onPointerMove, { passive: true });
+  canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
 
-  // Hope-pastel hex values for petals.
-  const petalColors = ['#ffd6e0', '#ffeac9', '#d4f1e4', '#dceefb', '#e8dff5', '#fff3c4'];
+  function resize() {
+    const r = container.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    canvas.style.width = `${r.width}px`;
+    canvas.style.height = `${r.height}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Re-seed petals to fit the new size.
+    if (petals.length === 0) {
+      for (let i = 0; i < COUNT; i++) petals.push(new Petal(r.width, r.height));
+    }
+  }
+  resize();
+  const ro = new ResizeObserver(resize);
+  ro.observe(container);
 
-  // tsParticles will inject its own canvas into container.
-  // We wrap it in a div so we can control pointer events.
-  const wrap = document.createElement('div');
-  wrap.style.position = 'absolute';
-  wrap.style.inset = '0';
-  wrap.style.pointerEvents = 'auto';
-  container.appendChild(wrap);
+  let last = performance.now();
+  let t = 0;
+  let raf = 0;
+  function frame(now) {
+    if (!shouldRender(canvas, vis)) {
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    t += dt;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
 
-  let pointerActive = false;
-  wrap.addEventListener('pointermove', () => { pointerActive = true; });
-  wrap.addEventListener('pointerleave', () => { pointerActive = false; });
+    // Soft repulsion from pointer (if inside).
+    let repel = null;
+    if (ptr.inside) {
+      const radius = 90;
+      repel = { x: ptr.x, y: ptr.y, r: radius, r2: radius * radius };
+    }
 
-  const cfg = {
-    fullScreen: { enable: false },
-    detectRetina: true,
-    background: { color: { value: 'transparent' } },
-    fpsLimit: reduced ? 30 : 60,
-    particles: {
-      number: { value: reduced ? 30 : 65, density: { enable: true, area: 800 } },
-      color: { value: petalColors },
-      shape: { type: 'circle' },
-      opacity: {
-        value: { min: 0.4, max: 0.85 },
-        animation: { enable: true, speed: 0.3, sync: false },
-      },
-      size: { value: { min: 3, max: 9 } },
-      move: {
-        enable: true,
-        direction: 'bottom',
-        speed: { min: 0.2, max: 0.6 },
-        random: true,
-        straight: false,
-        outModes: { default: 'out' },
-      },
-      rotate: {
-        value: { min: 0, max: 360 },
-        animation: { enable: true, speed: 2 },
-      },
-      tilt: {
-        direction: 'random',
-        enable: true,
-        value: { min: 0, max: 360 },
-        animation: { enable: true, speed: 3 },
-      },
-      wobble: { distance: 6, enable: true, speed: { min: -1, max: 1 } },
-    },
-  };
+    ctx.clearRect(0, 0, w, h);
 
-  const instance = window.tsParticles.load(wrap, cfg);
+    for (const p of petals) {
+      if (repel) {
+        const dx = p.x - repel.x;
+        const dy = p.y - repel.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < repel.r2) {
+          const d = Math.sqrt(d2) || 1;
+          const f = (1 - d / repel.r) * 0.7;
+          p.x += (dx / d) * f;
+          p.y += (dy / d) * f;
+        }
+      }
+      p.update(dt, t, w, h);
+      p.draw(ctx);
+    }
+
+    raf = requestAnimationFrame(frame);
+  }
+  raf = requestAnimationFrame(frame);
 
   return {
     destroy() {
-      try { instance.then(i => i && i.destroy && i.destroy()); } catch {}
-      wrap.remove();
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      vis.destroy();
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.remove();
     },
   };
 }
