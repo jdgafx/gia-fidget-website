@@ -174,14 +174,17 @@ body {
   pointer-events: none;
 }
 
-/* ---------- Effect (free-floating, no chrome) ---------- */
+/* ---------- Effect (frosted-glass artifact) ---------- */
 
 .effect-card {
   position: absolute;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  border-radius: 0;
+  background: rgba(15, 10, 30, 0.25);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65),
+              0 0 20px -8px rgba(167, 139, 250, 0.15);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
   overflow: visible;
   display: block;
   pointer-events: auto;
@@ -215,13 +218,13 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
   background: transparent;
   touch-action: none;
   border-radius: var(--radius);
   /* Subtle outer glow so the effect has presence on dark. */
-  filter: drop-shadow(0 0 28px rgba(167, 139, 250, 0.18))
-          drop-shadow(0 0 64px rgba(255, 107, 157, 0.10));
+  filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.10))
+          drop-shadow(0 0 48px rgba(255, 107, 157, 0.06));
 }
 
 .effect-canvas canvas {
@@ -231,14 +234,8 @@ body {
   border-radius: var(--radius);
 }
 
-/* Word-chip cards (love, hope) keep a subtle frosted look so the
-   text is readable. Free to transform like the others. */
-.effect-card.is-word .effect-canvas {
-  background: rgba(15, 10, 30, 0.35);
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  border-radius: var(--radius);
-}
+/* Word-chip cards (love, hope) — no special background needed.
+    The unified .effect-card chrome provides the frosted look. */
 
 /* ---------- Chip tray ---------- */
 
@@ -342,6 +339,132 @@ body {
   color: transparent;
   -webkit-text-fill-color: transparent;
   animation: titleFlow 10s linear infinite;
+}
+
+/* ---------- Controls hint (persistent bottom strip) ---------- */
+
+.controls-hint {
+  position: fixed;
+  z-index: 15;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  user-select: none;
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(15, 10, 30, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  opacity: 0;
+  animation: controlsHintFadeIn 800ms ease 400ms forwards;
+  white-space: nowrap;
+}
+
+@keyframes controlsHintFadeIn {
+  to { opacity: 1; }
+}
+
+.hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.hint-wheel { display: none; }
+
+@media (min-width: 768px) {
+  .hint-wheel { display: inline-flex; }
+}
+
+/* ---------- Neon glow (Zumies overlay — scoped to chip accents + title tag) ---------- */
+
+.neon-glow {
+  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor;
+}
+
+.chip-icon-svg {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+/* ---------- GIA tag below title ---------- */
+
+.gia-tag {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: clamp(10px, 2vw, 14px);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--violet);
+  text-shadow: 0 0 8px rgba(167, 139, 250, 0.6), 0 0 20px rgba(167, 139, 250, 0.3);
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+/* ---------- Passive mode ---------- */
+
+body.passive .effect-card {
+  opacity: 0.4 !important;
+  transition: opacity 600ms ease;
+}
+
+body.passive .vignette {
+  background: radial-gradient(140% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+/* ---------- Toast (variant / AI name overlay) ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 10, 30, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-hi);
+  color: var(--ink);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(16px, 4vw, 22px);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 0;
+  animation: toastIn 1.5s ease forwards;
+}
+
+@keyframes toastIn {
+  0%   { opacity: 0; transform: translate(-50%, -45%); }
+  15%  { opacity: 1; transform: translate(-50%, -50%); }
+  85%  { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -55%); }
+}
+
+/* ---------- Chip icon Zumies treatment ---------- */
+
+.chip-icon svg {
+  stroke-width: 2;
+}
+
+/* ---------- Chip toggle state ---------- */
+
+.chip-toggle.active {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
 }
 
 /* ---------- Desktop layout tweaks ---------- */

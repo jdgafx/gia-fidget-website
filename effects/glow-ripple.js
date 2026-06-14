@@ -13,7 +13,6 @@ export function mountGlowRipple(container) {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    background: linear-gradient(135deg, rgba(255, 229, 217, 0.35), rgba(220, 238, 251, 0.35));
   `;
   container.appendChild(wrap);
 
