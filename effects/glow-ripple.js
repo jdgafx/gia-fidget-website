@@ -85,7 +85,7 @@ export function mountGlowRipple(container) {
       spawn(x, y);
     }
     render();
-    requestAnimationFrame(tick);
+    raf = requestAnimationFrame(tick);
   }
 
   function render() {

@@ -34,6 +34,17 @@
     <span class="gia-tag" aria-hidden="true">✦ GIA ✦</span>
   </header>
 
+  <div class="site-controls" id="site-controls" aria-label="Controls">
+    <button class="control-btn" id="audio-toggle" type="button" aria-label="Toggle Audio">
+      <svg class="icon-audio-on" viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3v18l-6-6H2V9h4l6-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M15.5 8.5a4 4 0 0 1 0 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 5.5a9 9 0 0 1 0 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg class="icon-audio-off hidden" viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3v18l-6-6H2V9h4l6-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <button class="control-btn" id="symmetry-toggle" type="button" aria-label="Toggle Mirror Mode">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 8l-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <span class="control-badge" id="symmetry-badge">Off</span>
+    </button>
+  </div>
+
   <main id="effects-stage" class="effects-stage" aria-label="Effects">
     <div class="empty-state" id="empty-state">
       <div class="empty-state-orb"></div>

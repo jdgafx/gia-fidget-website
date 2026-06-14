@@ -6,21 +6,32 @@
 import { prefersReducedMotion } from '../lib/reduced-motion.js';
 import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
 
-export function mountLoveNote(container) {
+export function mountLoveNote(container, opts = {}) {
   const reduced = prefersReducedMotion();
   const speed = reduced ? 0.5 : 1.0;
 
+  const variant = opts.variant || 'Classic';
+  let phrase = "I Love You, Dad";
+  let smileys = [":)", ":)"];
+  if (variant === 'Playful') {
+    phrase = "You Are Awesome, Dad!";
+    smileys = ["★", "★"];
+  } else if (variant === 'Tender') {
+    phrase = "You Make Me Smile";
+    smileys = ["♥", "♥"];
+  }
+
+  const words = phrase.split(' ');
+  const phraseHtml = words.map((w, idx) => `<span class="love-word" style="--i:${idx}">${w}</span>`).join(' ');
+  const smileysHtml = smileys.map((s, idx) => `<span class="love-smiley" style="--i:${idx}">${s}</span>`).join(' ');
+
   container.innerHTML = `
-    <div class="love-note" role="figure" aria-label="I love you, Dad">
+    <div class="love-note" role="figure" aria-label="${phrase}">
       <div class="love-note-phrase">
-        <span class="love-word" style="--i:0">I</span>
-        <span class="love-word" style="--i:1">Love</span>
-        <span class="love-word" style="--i:2">You,</span>
-        <span class="love-word" style="--i:3">Dad</span>
+        ${phraseHtml}
       </div>
       <div class="love-smileys" aria-hidden="true">
-        <span class="love-smiley" style="--i:0">:)</span>
-        <span class="love-smiley" style="--i:1">:)</span>
+        ${smileysHtml}
       </div>
       <div class="love-shimmer" aria-hidden="true"></div>
     </div>

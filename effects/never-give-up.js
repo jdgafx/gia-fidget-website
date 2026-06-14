@@ -6,22 +6,37 @@
 import { prefersReducedMotion } from '../lib/reduced-motion.js';
 import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
 
-export function mountNeverGiveUp(container) {
+export function mountNeverGiveUp(container, opts = {}) {
   const reduced = prefersReducedMotion();
   const speed = reduced ? 0.4 : 1.0;
 
-  const word1 = 'Never'.split('');
-  const word2 = 'Give'.split('');
-  const word3 = 'Up'.split('');
+  const variant = opts.variant || 'Classic';
+  let lines = [["Never"], ["Give", "Up"]];
+  if (variant === 'Bold') {
+    lines = [["Dream"], ["Big", "Dreams"]];
+  } else if (variant === 'Gentle') {
+    lines = [["Breathe", "In,"], ["Breathe", "Out"]];
+  }
 
-  const spans = (letters) => letters
-    .map((ch, i) => `<span class="ng-letter" style="--i:${i}">${ch}</span>`)
-    .join('');
+  const spans = (words) => {
+    let index = 0;
+    return words.map(word => {
+      return word.split('').map(ch => {
+        const span = `<span class="ng-letter" style="--i:${index}">${ch}</span>`;
+        index++;
+        return span;
+      }).join('') + '<span class="ng-space">&nbsp;</span>';
+    }).join('');
+  };
+
+  const line1Html = spans(lines[0]);
+  const line2Html = spans(lines[1]);
+  const fullText = lines.flat().join(' ');
 
   container.innerHTML = `
-    <div class="ng" role="figure" aria-label="Never give up">
-      <div class="ng-line ng-line-1">${spans(word1)}</div>
-      <div class="ng-line ng-line-2">${spans(word2)}<span class="ng-space">&nbsp;</span>${spans(word3)}</div>
+    <div class="ng" role="figure" aria-label="${fullText}">
+      <div class="ng-line ng-line-1">${line1Html}</div>
+      <div class="ng-line ng-line-2">${line2Html}</div>
       <div class="ng-underline" aria-hidden="true">
         <div class="ng-underline-fill"></div>
       </div>
