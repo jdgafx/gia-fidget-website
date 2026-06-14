@@ -422,13 +422,13 @@ function applyBounceFeedback(el) {
 
 // ---------- Spawn effect handler ----------
 
-function spawnEffect(effectKey, variantIdx = 0) {
+function spawnEffect(effectKey, variantIdx = 0, customX = null, customY = null) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const size = Math.min(280, Math.min(vw, vh) * 0.5);
 
-  const cx = size / 2 + Math.random() * (vw - size);
-  const cy = size / 2 + Math.random() * (vh - size);
+  const cx = customX !== null ? customX : (size / 2 + Math.random() * (vw - size));
+  const cy = customY !== null ? customY : (size / 2 + Math.random() * (vh - size));
   const initRot = (Math.random() - 0.5) * 40;
 
   const mode = symmetry.getMode();
@@ -605,4 +605,13 @@ const passiveMode = createPassiveMode({
 
 updateAudioUI();
 updateSymmetryUI();
+
+// Pre-populate playground with 3 gorgeous interactive cards
+const vw = window.innerWidth;
+const vh = window.innerHeight;
+
+spawnEffect('soap-bubble', 0, vw * 0.28, vh * 0.45);
+spawnEffect('petal-drift', 0, vw * 0.72, vh * 0.35);
+spawnEffect('love-note', 0, vw * 0.5, vh * 0.72);
+
 updateEmptyState();
