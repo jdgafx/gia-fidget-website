@@ -1,12 +1,11 @@
 /* ============================================================
-   For Gia — fidget playground styles
-   DARK MODE — Apple.com-inspired. Deep plum/indigo base, glass
-   cards, high-contrast rainbow accents. Mobile-first, desktop-equal.
+   For Gia — CANDY THEMED fidget playground styles
+   Vivid colors, bouncy animations, radial menu styles, orb cursor styles.
    ============================================================ */
 
 :root {
-  /* Dark base — deep plum/indigo, never pure black */
-  --bg-deep:    #07050f;
+  /* Candy palette */
+  --bg-deep:    #0a0612;
   --bg-1:       #0e0a1d;
   --bg-2:       #15102a;
   --bg-3:       #1d1640;
@@ -22,7 +21,7 @@
   --ink-soft:  #b8b0d0;
   --ink-dim:   #6b6580;
 
-  /* Vibrant accents (high contrast on dark) */
+  /* Vibrant accents */
   --rose:    #ff6b9d;
   --violet:  #a78bfa;
   --blue:    #60a5fa;
@@ -31,7 +30,7 @@
   --gold:    #fbbf24;
   --magenta: #e879f9;
 
-  /* Hope-rainbow gradient (used for hero text) */
+  /* Hope-rainbow gradient */
   --rainbow: linear-gradient(110deg,
     hsl(340 85% 70%),
     hsl(290 80% 72%),
@@ -58,7 +57,7 @@ html, body {
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--bg-deep);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -73,6 +72,7 @@ html, body {
 body {
   min-height: 100dvh;
   position: relative;
+  cursor: none;
   background:
     radial-gradient(120% 80% at 20% 10%, rgba(167, 139, 250, 0.12) 0%, transparent 60%),
     radial-gradient(120% 80% at 80% 30%, rgba(96, 165, 250, 0.10) 0%, transparent 60%),
@@ -132,7 +132,7 @@ body {
   -webkit-text-fill-color: transparent;
   letter-spacing: 0.01em;
   animation: titleFlow 16s linear infinite;
-  filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.25));
+  filter: drop-shadow(0 0 32px rgba(167, 139, 250, 0.35));
 }
 
 @keyframes titleFlow {
@@ -221,9 +221,44 @@ body {
   transition-duration: 80ms;
 }
 
-/* ---------- Empty state prompt ---------- */
+/* ---------- Effects stage ---------- */
 
-.empty-state-prompt {
+.effects-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ---------- Effect entities ---------- */
+
+.effect-entity {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  will-change: transform;
+  transform-origin: 50% 50%;
+  perspective: 1200px;
+  transition: margin 0.3s ease-out;
+}
+
+.effect-entity.dragging {
+  z-index: 100;
+  filter: drop-shadow(0 0 40px rgba(167, 139, 250, 0.4));
+}
+
+.effect-entity.orb-ripple {
+  animation: orbRipple 0.4s ease-out;
+}
+
+@keyframes orbRipple {
+  0% { filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.6)); }
+  100% { filter: none; }
+}
+
+/* ---------- Empty state ---------- */
+
+.empty-state {
   position: fixed;
   top: 50%;
   left: 50%;
@@ -232,289 +267,30 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   pointer-events: none;
   user-select: none;
-  opacity: 1;
-  transition: opacity 600ms ease;
 }
 
-.empty-state-prompt.hidden {
-  opacity: 0;
+.empty-state-orb {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.6), rgba(167, 139, 250, 0.2), transparent);
+  animation: emptyOrbPulse 2s ease-in-out infinite;
 }
 
-.empty-state-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-soft);
-  opacity: 0.5;
-  filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.25));
-  animation: emptyPulse 3s ease-in-out infinite;
+@keyframes emptyOrbPulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
 }
 
-@keyframes emptyPulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50%      { opacity: 0.6;  transform: scale(1.06); }
-}
-
-.empty-state-text {
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
-  font-size: clamp(12px, 2.8vw, 14px);
-  color: var(--ink-soft);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-/* ---------- Chip tap feedback ---------- */
-
-@keyframes chip-tap-feedback {
-  0%   { transform: scale(1);   border-color: var(--border-hi); box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4); }
-  33%  { transform: scale(1.08); border-color: rgba(167, 139, 250, 0.6); box-shadow: 0 0 20px -4px rgba(167, 139, 250, 0.5); }
-  100% { transform: scale(1);   border-color: var(--border-hi); box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4); }
-}
-
-.chip-tap-feedback {
-  animation: chip-tap-feedback 450ms ease-out !important;
-}
-
-/* ---------- First chip pulse ---------- */
-
-@keyframes chip-first-pulse {
-  0%, 100% { box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4); }
-  50%      { box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4), 0 0 16px -4px rgba(167, 139, 250, 0.45); }
-}
-
-.chip-first-pulse {
-  animation: chip-first-pulse 2.4s ease-in-out infinite;
-}
-
-/* ---------- Gesture tooltip ---------- */
-
-.gesture-tooltip {
-  position: absolute;
-  top: -36px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(15, 10, 30, 0.80);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border);
-  color: var(--ink-soft);
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  animation: tooltipFadeIn 400ms ease forwards;
-}
-
-.gesture-tooltip.fading-out {
-  animation: tooltipFadeOut 400ms ease forwards;
-}
-
-@keyframes tooltipFadeIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-@keyframes tooltipFadeOut {
-  from { opacity: 1; transform: translateX(-50%) translateY(0); }
-  to   { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-}
-
-/* ---------- Effects stage ---------- */
-
-.effects-stage {
-  position: relative;
-  z-index: 5;
-  min-height: 100dvh;
-  width: 100%;
-  pointer-events: none;
-}
-
-/* ---------- Effect (frosted-glass artifact) ---------- */
-
-.effect-card {
-  position: absolute;
-  background: rgba(15, 10, 30, 0.25);
-  border: 1px solid var(--border);
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65),
-              0 0 20px -8px rgba(167, 139, 250, 0.15);
-  border-radius: var(--radius);
-  backdrop-filter: blur(12px) saturate(1.1);
-  -webkit-backdrop-filter: blur(12px) saturate(1.1);
-  overflow: visible;
-  display: block;
-  pointer-events: auto;
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity 600ms ease, transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
-  will-change: transform, opacity;
-  touch-action: none;
-}
-
-.effect-card.mounted {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.effect-card.closing {
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 400ms ease, transform 400ms ease;
-}
-
-.effect-handle {
-  display: none;
-}
-
-.effect-close {
-  display: none;
-}
-
-.effect-canvas {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: transparent;
-  touch-action: none;
-  border-radius: var(--radius);
-  /* Subtle outer glow so the effect has presence on dark. */
-  filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.10))
-          drop-shadow(0 0 48px rgba(255, 107, 157, 0.06));
-}
-
-.effect-canvas canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-  border-radius: var(--radius);
-}
-
-/* Word-chip cards (love, hope) — no special background needed.
-    The unified .effect-card chrome provides the frosted look. */
-
-/* ---------- Chip tray ---------- */
-
-.chip-tray {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 12px);
-  background: linear-gradient(180deg, transparent, rgba(7, 5, 15, 0.6) 30%, rgba(7, 5, 15, 0.95));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  pointer-events: none;
-}
-
-.chip-tray-inner {
-  display: flex;
-  gap: 8px;
-  padding: 0 14px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  pointer-events: auto;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  align-items: center;
-}
-
-.chip-tray-inner::-webkit-scrollbar { display: none; }
-
-.chip {
-   flex: 0 0 auto;
-   min-width: 84px;
-   min-height: 68px;
-   display: flex;
-   flex-direction: column;
-   align-items: center;
-   justify-content: center;
-   gap: 4px;
-   padding: 10px 14px;
-   border: 1px solid var(--border-hi);
-   background: var(--glass-strong);
-   backdrop-filter: blur(10px);
-   -webkit-backdrop-filter: blur(10px);
-   border-radius: var(--radius-sm);
-   color: var(--ink);
-   font-family: inherit;
-   font-size: 11px;
-   font-weight: 500;
-   letter-spacing: 0.10em;
-   text-transform: uppercase;
-   cursor: pointer;
-   box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.4);
-   transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
-               background 240ms ease,
-               box-shadow 240ms ease,
-               border-color 240ms ease;
-   scroll-snap-align: center;
- }
-
-.chip:hover,
-.chip:focus-visible {
-  background: rgba(255, 255, 255, 0.10);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px -8px rgba(167, 139, 250, 0.40);
-  border-color: rgba(167, 139, 250, 0.35);
-  outline: none;
-}
-
-.chip:active {
-  transform: translateY(0);
-  transition-duration: 80ms;
-}
-
-.chip-icon {
-  color: var(--ink-soft);
-  display: flex;
-}
-
-.chip-label {
-   font-size: 11px;
-   letter-spacing: 0.14em;
-   color: var(--ink-soft);
- }
-
-.chip-divider {
-  flex: 0 0 1px;
-  width: 1px;
-  align-self: stretch;
-  margin: 8px 4px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.18), transparent);
-}
-
-.chip-word .chip-icon { color: var(--rose); }
-.chip-word .chip-label {
-  background: var(--rainbow);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: titleFlow 10s linear infinite;
-}
-
-/* ---------- Controls hint (persistent bottom strip) ---------- */
+/* ---------- Controls hint ---------- */
 
 .controls-hint {
   position: fixed;
   z-index: 15;
-  bottom: 96px;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -554,16 +330,6 @@ body {
   .hint-wheel { display: inline-flex; }
 }
 
-/* ---------- Neon glow (Zumies overlay — scoped to chip accents + title tag) ---------- */
-
-.neon-glow {
-  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor;
-}
-
-.chip-icon-svg {
-  filter: drop-shadow(0 0 3px currentColor);
-}
-
 /* ---------- GIA tag below title ---------- */
 
 .gia-tag {
@@ -574,23 +340,12 @@ body {
   letter-spacing: 0.35em;
   text-transform: uppercase;
   color: var(--violet);
-  text-shadow: 0 0 8px rgba(167, 139, 250, 0.6), 0 0 20px rgba(167, 139, 250, 0.3);
+  text-shadow: 0 0 12px rgba(167, 139, 250, 0.8), 0 0 28px rgba(167, 139, 250, 0.4);
   margin-top: 2px;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
-/* ---------- Passive mode ---------- */
-
-body.passive .effect-card {
-  opacity: 0.4 !important;
-  transition: opacity 600ms ease;
-}
-
-body.passive .vignette {
-  background: radial-gradient(140% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
-}
-
-/* ---------- Toast (variant / AI name overlay) ---------- */
+/* ---------- Toast ---------- */
 
 .toast {
   position: fixed;
@@ -622,27 +377,15 @@ body.passive .vignette {
   100% { opacity: 0; transform: translate(-50%, -55%); }
 }
 
-/* ---------- Chip icon Zumies treatment ---------- */
+/* ---------- Passive mode ---------- */
 
-.chip-icon svg {
-  stroke-width: 2;
+body.passive .effect-entity {
+  opacity: 0.4 !important;
+  transition: opacity 600ms ease;
 }
 
-/* ---------- Chip toggle state ---------- */
-
-.chip-toggle.active {
-  border-color: rgba(167, 139, 250, 0.5);
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
-}
-
-/* ---------- Desktop layout tweaks ---------- */
-
-@media (min-width: 768px) {
-  .chip-tray-inner {
-    justify-content: center;
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
+body.passive .vignette {
+  background: radial-gradient(140% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
 }
 
 /* ---------- prefers-reduced-motion ---------- */
@@ -651,21 +394,14 @@ body.passive .vignette {
   .prompt {
     transition-duration: 2400ms;
   }
-  .effect-card {
+  .effect-entity {
     transition-duration: 600ms;
   }
   .title,
-  .effect-handle-title,
-  .chip-word .chip-label {
+  .gia-tag {
     animation-duration: 30s;
   }
-  .chip-tap-feedback {
-    animation-duration: 150ms;
-  }
-  .chip-first-pulse {
-    animation: none !important;
-  }
-  .empty-state-icon {
+  .empty-state-orb {
     animation-duration: 30s;
   }
   .gesture-tooltip {
