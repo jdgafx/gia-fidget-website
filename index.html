@@ -36,7 +36,19 @@
     <span class="gia-tag" aria-hidden="true">✦ GIA ✦</span>
   </header>
 
-  <main id="effects-stage" class="effects-stage" aria-label="Effects"></main>
+  <main id="effects-stage" class="effects-stage" aria-label="Effects">
+    <div class="welcome-card" id="welcome-card" aria-label="Welcome">
+      <p class="welcome-card-text">A peaceful fidget playground ✨</p>
+      <p class="welcome-card-sub">Tap a chip below to create something beautiful</p>
+      <button class="welcome-btn" type="button" aria-label="Start Playing">Start Playing</button>
+    </div>
+    <div class="empty-state-prompt hidden" id="empty-state-prompt" aria-hidden="true">
+      <span class="empty-state-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.6"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.3"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.15"/></svg>
+      </span>
+      <span class="empty-state-text">Tap a glow below to begin</span>
+    </div>
+  </main>
 
   <nav class="chip-tray" id="chip-tray" aria-label="Add an effect">
     <div class="chip-tray-inner" id="chip-tray-inner">
@@ -117,18 +129,20 @@
   </nav>
 
   <!-- Persistent control hints — always visible bottom strip.
-        Mobile: drag · pinch · rotate · double-tap
-        Desktop: drag · pinch · rotate · tilt · scroll · double-tap -->
-  <aside class="controls-hint" id="controls-hint" aria-label="Controls">
-    <span class="hint-item">drag</span>
+        Mobile: Move · Resize · Spin · Close
+        Desktop: Move · Resize · Spin · Tilt · Zoom · Close -->
+  <aside class="controls-hint" id="controls-hint" aria-label="How to interact with effects">
+    <span class="hint-item">Move</span>
     <span class="hint-item">·</span>
-    <span class="hint-item">pinch + rotate</span>
+    <span class="hint-item">Resize</span>
     <span class="hint-item">·</span>
-    <span class="hint-item hint-wheel">3D tilt</span>
+    <span class="hint-item">Spin</span>
+    <span class="hint-item">·</span>
+    <span class="hint-item hint-wheel">Tilt</span>
     <span class="hint-item hint-wheel">·</span>
-    <span class="hint-item hint-wheel">scroll</span>
+    <span class="hint-item hint-wheel">Zoom</span>
     <span class="hint-item">·</span>
-    <span class="hint-item">double-tap ✕</span>
+    <span class="hint-item">Close</span>
   </aside>
 
   <script type="module" src="main.js"></script>
