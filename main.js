@@ -136,6 +136,10 @@ function dismissWelcomeCard() {
     welcomeCardEl.remove();
     welcomeCardEl = null;
   }, 300);
+  // Show empty state prompt after welcome is dismissed and no cards are on screen.
+  if (spawnedCards.length === 0) {
+    showEmptyState();
+  }
 }
 
 // ---------- Empty state prompt ----------
