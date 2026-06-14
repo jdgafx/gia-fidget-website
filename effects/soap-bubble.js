@@ -116,6 +116,12 @@ export function mountSoapBubble(container) {
     if (phase === 'idle' || phase === 'appearing') {
       phase = 'dissolving';
       phaseT = 0;
+      const rect = canvas.getBoundingClientRect();
+      const x = rect.width / 2;
+      const y = rect.height / 2;
+      import('../lib/party-explosion.js').then(m => {
+        m.createExplosion(container, x, y, 'sparkles');
+      });
     }
   }
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });

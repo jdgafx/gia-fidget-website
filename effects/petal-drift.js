@@ -94,11 +94,21 @@ export function mountPetalDrift(container) {
 
   // Pointer repulsion state.
   const ptr = { x: 0, y: 0, inside: false };
+  let lastPtrX = 0, lastPtrY = 0, lastPtrSpeed = 0;
 
   function onPointerMove(e) {
     const r = canvas.getBoundingClientRect();
-    ptr.x = e.clientX - r.left;
-    ptr.y = e.clientY - r.top;
+    const newX = e.clientX - r.left;
+    const newY = e.clientY - r.top;
+    const speed = Math.hypot(newX - ptr.x, newY - ptr.y);
+    if (speed > 30 && lastPtrSpeed < 10) {
+      import('../lib/party-explosion.js').then(m => {
+        m.createExplosion(container, newX, newY, 'confetti');
+      });
+    }
+    lastPtrSpeed = speed;
+    ptr.x = newX;
+    ptr.y = newY;
     ptr.inside = true;
   }
   function onPointerLeave() { ptr.inside = false; }
