@@ -104,11 +104,13 @@ function makeCard(effectKey) {
 
   card.appendChild(canvas);
 
-  // Random initial scale (0.7–1.0) and rotation (-12° to 12°) so each
-  // spawned effect feels unique, like floating stickers.
+  // Random initial scale + 3D rotation so each spawned effect feels
+  // unique, like floating stickers you can grab and throw.
   const { x, y, cardW, cardH } = nextSpawnPosition();
-  const initScale = 0.7 + Math.random() * 0.3;
-  const initRot = (Math.random() - 0.5) * 24;
+  const initScale = 0.5 + Math.random() * 0.6;        // 0.5–1.1
+  const initRotZ = (Math.random() - 0.5) * 60;       // ±30°
+  const initRotX = (Math.random() - 0.5) * 30;       // ±15°
+  const initRotY = (Math.random() - 0.5) * 30;
   card.style.left = '0px';
   card.style.top = '0px';
   card.style.width = `${cardW}px`;
@@ -122,12 +124,15 @@ function makeCard(effectKey) {
     card._instance = instance;
   });
 
-  // Free transform — drag, pinch, rotate, double-tap to close.
+  // Free transform — extreme: drag (1-finger), pinch+rotate (2-finger),
+  // 3D tilt (3-finger), double-tap to close, momentum on release.
   const ft = makeFreeTransform(card, {
     onDoubleTap: () => closeCard(card, ft),
   });
-  // Center the card initially, then position it.
-  ft.setTransform(x + cardW / 2, y + cardH / 2, initScale, initRot);
+  ft.setTransform(
+    x + cardW / 2, y + cardH / 2,
+    initScale, initRotZ, initRotX, initRotY
+  );
 
   // Mount animation.
   requestAnimationFrame(() => {
