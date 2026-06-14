@@ -27,11 +27,12 @@ const VERT = /* glsl */`
     vSide = aSide;
     vec3 p = position;
 
-    // Two traveling sine waves combined for organic flow.
-    float t = uTime * 0.65;
-    float wave = sin(p.x * 1.8 + t) * 0.24
-               + sin(p.x * 3.1 - t * 0.7 + 1.3) * 0.12
-               + sin(p.x * 5.3 + t * 1.3) * 0.06;
+    // Active pinwheel-spinning waves.
+    float t = uTime * 1.0;
+    float wave = sin(p.x * 2.0 + t) * 0.26
+               + sin(p.x * 3.6 - t * 0.8 + 1.3) * 0.14
+               + sin(p.x * 5.3 + t * 1.3) * 0.08
+               + sin(p.x * 8.0 - t * 1.7) * 0.04;
 
     // Pointer bias — pushes the wave up dramatically where the pointer is.
     float px = uPointer;

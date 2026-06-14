@@ -35,10 +35,21 @@ class Petal {
     this.alpha = 0.6 + Math.random() * 0.35;
   }
   update(dt, t, w, h) {
+    // Swirl vortex — petals rotate around the center as they fall.
+    const cx = w / 2;
+    const cy = h / 2;
+    const dx = this.x - cx;
+    const dy = this.y - cy;
+    const r = Math.sqrt(dx * dx + dy * dy) || 1;
+    // Tangential force creates pinwheel spin.
+    const tangX = -dy / r;
+    const tangY = dx / r;
     // Sway
     const sway = Math.sin(t * this.swaySpeed + this.swayPhase) * this.swayAmp;
-    this.x += (this.vx + sway * 0.4) * dt * 60;
-    this.y += this.vy * dt * 60;
+    // Center pull gets weaker with radius (vortex profile).
+    const spinStrength = 0.018 * (1 - Math.min(1, r / Math.max(w, h)));
+    this.x += (tangX * spinStrength + this.vx + sway * 0.4) * dt * 60;
+    this.y += (tangY * spinStrength + this.vy) * dt * 60;
     this.rot += this.vrot * dt * 60;
     if (this.y > h + 20 || this.x < -20 || this.x > w + 20) this.reset(w, h);
   }

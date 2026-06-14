@@ -90,8 +90,8 @@ body {
   height: 100dvh;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.55;
-  mix-blend-mode: screen;
+  opacity: 0.95;
+  mix-blend-mode: normal;
 }
 
 .vignette {
@@ -174,127 +174,70 @@ body {
   pointer-events: none;
 }
 
-/* ---------- Effect card ---------- */
+/* ---------- Effect (free-floating, no chrome) ---------- */
 
 .effect-card {
-  --tilt-x: 0deg;
-  --tilt-y: 0deg;
-  --lift-y: 0px;
   position: absolute;
-  background: var(--glass);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+  display: block;
   pointer-events: auto;
   opacity: 0;
-  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(0.94) translateY(calc(10px + var(--lift-y)));
-  transition: opacity 480ms ease,
-              transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1),
-              box-shadow 600ms ease,
-              border-color 600ms ease;
+  transform: scale(0.7);
+  transition: opacity 600ms ease, transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
   will-change: transform, opacity;
   touch-action: none;
 }
 
 .effect-card.mounted {
   opacity: 1;
-  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1) translateY(var(--lift-y));
-}
-
-.effect-card:hover {
-  box-shadow: var(--shadow-hi);
-  border-color: var(--border-hi);
+  transform: scale(1);
 }
 
 .effect-card.closing {
   opacity: 0;
-  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(0.94) translateY(calc(8px + var(--lift-y)));
-  transition: opacity 360ms ease, transform 360ms ease;
+  transform: scale(0.6);
+  transition: opacity 400ms ease, transform 400ms ease;
 }
 
 .effect-handle {
-  height: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 0 18px;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.0));
-  border-bottom: 1px solid var(--border);
-}
-
-.effect-handle:active { cursor: grabbing; }
-
-.effect-handle-title {
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.20em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  pointer-events: none;
-  background: var(--rainbow);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: titleFlow 12s linear infinite;
+  display: none;
 }
 
 .effect-close {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
-  border-radius: 50%;
-  transition: background 200ms ease, color 200ms ease, transform 200ms ease;
-  font-family: inherit;
-  position: relative;
-  z-index: 2;
-  touch-action: manipulation;
-}
-
-.effect-close:hover,
-.effect-close:focus-visible {
-  background: rgba(255, 107, 157, 0.18);
-  color: var(--rose);
-  outline: none;
-  transform: scale(1.08);
-}
-
-.effect-close:active {
-  transform: scale(0.94);
+  display: none;
 }
 
 .effect-canvas {
-  flex: 1;
   position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(60% 50% at 30% 30%, rgba(167, 139, 250, 0.10), transparent 60%),
-    radial-gradient(60% 50% at 70% 70%, rgba(96, 165, 250, 0.08), transparent 60%),
-    var(--bg-1);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  background: transparent;
   touch-action: none;
+  border-radius: var(--radius);
+  /* Subtle outer glow so the effect has presence on dark. */
+  filter: drop-shadow(0 0 28px rgba(167, 139, 250, 0.18))
+          drop-shadow(0 0 64px rgba(255, 107, 157, 0.10));
 }
 
 .effect-canvas canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  border-radius: var(--radius);
+}
+
+/* Word-chip cards (love, hope) keep a subtle frosted look so the
+   text is readable. Free to transform like the others. */
+.effect-card.is-word .effect-canvas {
+  background: rgba(15, 10, 30, 0.35);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  border-radius: var(--radius);
 }
 
 /* ---------- Chip tray ---------- */
@@ -470,8 +413,16 @@ body {
   text-align: center;
   color: #ffeaf0;
   text-shadow: 0 0 16px rgba(255, 107, 157, 0.35);
-  transform: translate(calc(var(--mx) * 12px), calc(var(--my) * 8px));
+  transform: translate(calc(var(--mx) * 12px), calc(var(--my) * 8px))
+             rotate(calc(var(--ma, 0) * 6deg));
   transition: transform 90ms linear;
+  animation: lovePhraseOrbit 6s ease-in-out infinite;
+  animation-duration: calc(6s / var(--speed));
+}
+
+@keyframes lovePhraseOrbit {
+  0%, 100% { letter-spacing: 0; }
+  50%      { letter-spacing: 0.06em; }
 }
 
 .love-word {
@@ -494,8 +445,17 @@ body {
   font-weight: 400;
   font-size: clamp(28px, 8vw, 48px);
   line-height: 1;
-  transform: translate(calc(var(--mx) * -16px), calc(var(--my) * -10px));
+  transform: translate(calc(var(--mx) * -16px), calc(var(--my) * -10px))
+             rotate(calc(var(--ma, 0) * -8deg));
   transition: transform 90ms linear;
+  animation: loveSpin 4s linear infinite;
+  animation-duration: calc(4s / var(--speed));
+}
+
+@keyframes loveSpin {
+  0%   { letter-spacing: 0; }
+  50%  { letter-spacing: 8px; }
+  100% { letter-spacing: 0; }
 }
 
 .love-smiley {
@@ -603,6 +563,16 @@ body {
   line-height: 1.0;
   text-align: center;
   filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.25));
+  transform: translate(calc(var(--mx) * 14px), calc(var(--my) * 10px))
+             rotate(calc(var(--ma, 0) * 5deg));
+  transition: transform 90ms linear;
+  animation: ngSpin 5s ease-in-out infinite;
+  animation-duration: calc(5s / var(--speed));
+}
+
+@keyframes ngSpin {
+  0%, 100% { letter-spacing: 0; }
+  50%      { letter-spacing: 0.10em; }
 }
 
 .ng-line-1 { letter-spacing: 0.04em; }

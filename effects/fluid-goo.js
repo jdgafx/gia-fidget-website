@@ -58,21 +58,26 @@ const FRAG = /* glsl */`
   void main() {
     vec2 uv = vUv * 2.0 - 1.0;
 
-    // Fluid displacement — soft, organic.
-    float n = fbm(uv * 1.4 + vec2(uTime * 0.07, -uTime * 0.05));
-    float r = length(uv) + (n - 0.5) * 0.30;
+    // Spin the whole cluster around its center, pinwheel-style.
+    float spin = uTime * 0.55;
+    vec2 ruv = vec2(
+      uv.x * cos(spin) - uv.y * sin(spin),
+      uv.x * sin(spin) + uv.y * cos(spin)
+    );
 
-    // Soft-min field — multiple blobs to give the goo look.
+    // Fluid displacement — soft, organic.
+    float n = fbm(ruv * 1.4 + vec2(uTime * 0.18, -uTime * 0.12));
+    float r = length(ruv) + (n - 0.5) * 0.30;
+
+    // Soft-min field — multiple blobs to give the goo look. Spinning.
     float blobs = 0.0;
-    for (int i = 0; i < 5; i++) {
-      float a = float(i) * 1.2566;       // 72° steps
-      // Blobs follow the pointer with a swirl — the whole cluster
-      // leans toward the cursor.
+    for (int i = 0; i < 6; i++) {
+      float a = float(i) * 1.0472 + uTime * 0.55;  // 60° steps, fast spin
       vec2 pOff = uPointerLocal * 0.35;
-      float radius = 0.32 + 0.14 * sin(uTime * 0.9 + a);
-      vec2 c = vec2(cos(a + uTime * 0.45), sin(a + uTime * 0.4)) * 0.34 + pOff;
+      float radius = 0.30 + 0.14 * sin(uTime * 1.2 + a);
+      vec2 c = vec2(cos(a), sin(a)) * 0.38 + pOff;
       float d = length(uv - c) - radius;
-      blobs += 0.20 / (d * d * 30.0 + 0.1);
+      blobs += 0.20 / (d * d * 28.0 + 0.1);
     }
 
     float mask = smoothstep(0.55, 1.05, blobs + 0.6);

@@ -13,7 +13,7 @@ import { mountGalaxy }       from './effects/galaxy.js';
 import { mountGlowRipple }   from './effects/glow-ripple.js';
 import { mountLoveNote }     from './effects/love-note.js';
 import { mountNeverGiveUp }  from './effects/never-give-up.js';
-import { makeDraggable }     from './lib/draggable.js';
+import { makeFreeTransform } from './lib/free-transform.js';
 import { isDocumentVisible } from './lib/visibility.js';
 
 const EFFECT_LABELS = {
@@ -37,6 +37,8 @@ const EFFECT_MOUNT = {
   'love-note':     mountLoveNote,
   'never-give-up': mountNeverGiveUp,
 };
+
+const WORD_EFFECTS = new Set(['love-note', 'never-give-up']);
 
 // ---------- Ambient background ----------
 
@@ -94,60 +96,40 @@ function makeCard(effectKey) {
   if (!mount) return;
 
   const card = document.createElement('div');
-  card.className = 'effect-card';
-  const label = EFFECT_LABELS[effectKey] || 'Effect';
-
-  const handle = document.createElement('div');
-  handle.className = 'effect-handle';
-  const title = document.createElement('span');
-  title.className = 'effect-handle-title';
-  title.textContent = label;
-  const close = document.createElement('button');
-  close.className = 'effect-close';
-  close.setAttribute('aria-label', `Close ${label}`);
-  close.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-  handle.appendChild(title);
-  handle.appendChild(close);
+  card.className = 'effect-card' + (WORD_EFFECTS.has(effectKey) ? ' is-word' : '');
+  card.dataset.effect = effectKey;
 
   const canvas = document.createElement('div');
   canvas.className = 'effect-canvas';
 
-  card.appendChild(handle);
   card.appendChild(canvas);
 
+  // Random initial scale (0.7–1.0) and rotation (-12° to 12°) so each
+  // spawned effect feels unique, like floating stickers.
   const { x, y, cardW, cardH } = nextSpawnPosition();
-  card.style.left = `${x}px`;
-  card.style.top  = `${y}px`;
-  card.style.width  = `${cardW}px`;
+  const initScale = 0.7 + Math.random() * 0.3;
+  const initRot = (Math.random() - 0.5) * 24;
+  card.style.left = '0px';
+  card.style.top = '0px';
+  card.style.width = `${cardW}px`;
   card.style.height = `${cardH}px`;
   stage.appendChild(card);
 
-  // Mount effect (some return Promises — petal-drift waits for tsparticles).
+  // Mount effect.
   const instanceOrPromise = mount(canvas);
   Promise.resolve(instanceOrPromise).then(instance => {
     if (!instance) return;
     card._instance = instance;
   });
 
-  // Make draggable.
-  const drag = makeDraggable(card, handle);
-
-  // 3D mouse tilt — tracks pointer over the card, gives subtle
-  // perspective tilt + a tiny lift. Disabled while dragging.
-  const tilt = attachTilt(card);
-
-  // Close.
-  close.addEventListener('click', () => {
-    card.classList.add('closing');
-    setTimeout(() => {
-      try { card._instance && card._instance.destroy && card._instance.destroy(); } catch {}
-      drag.destroy();
-      tilt.destroy();
-      card.remove();
-    }, 380);
+  // Free transform — drag, pinch, rotate, double-tap to close.
+  const ft = makeFreeTransform(card, {
+    onDoubleTap: () => closeCard(card, ft),
   });
+  // Center the card initially, then position it.
+  ft.setTransform(x + cardW / 2, y + cardH / 2, initScale, initRot);
 
-  // Mount animation: opacity + scale.
+  // Mount animation.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       card.classList.add('mounted');
@@ -158,64 +140,22 @@ function makeCard(effectKey) {
   return card;
 }
 
+function closeCard(card, ft) {
+  if (card.classList.contains('closing')) return;
+  card.classList.add('closing');
+  setTimeout(() => {
+    try { card._instance && card._instance.destroy && card._instance.destroy(); } catch {}
+    ft && ft.destroy();
+    card.remove();
+  }, 420);
+}
+
 tray.addEventListener('click', e => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   const key = chip.dataset.effect;
   makeCard(key);
 });
-
-// ---------- 3D mouse tilt on every card ----------
-
-function attachTilt(card) {
-  const TILT_MAX = 12;       // degrees
-  const LIFT_MAX = 6;        // px
-  const DAMP = 0.18;         // 0..1
-  let tgtX = 0, tgtY = 0, tgtLift = 0;
-  let curX = 0, curY = 0, curLift = 0;
-  let hovering = false;
-  let raf = 0;
-  let lastMoveT = 0;
-
-  function onMove(e) {
-    const r = card.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    tgtY  = (x - 0.5) * TILT_MAX * 2;          // ±TILT_MAX
-    tgtX  = (0.5 - y) * TILT_MAX * 2;          // ±TILT_MAX
-    tgtLift = -LIFT_MAX;                       // float up while hovered
-    hovering = true;
-    lastMoveT = performance.now();
-  }
-  function onLeave() {
-    tgtX = 0; tgtY = 0; tgtLift = 0;
-    hovering = false;
-  }
-
-  card.addEventListener('pointermove', onMove, { passive: true });
-  card.addEventListener('pointerenter', onMove, { passive: true });
-  card.addEventListener('pointerleave', onLeave, { passive: true });
-
-  function tick() {
-    curX    += (tgtX - curX) * DAMP;
-    curY    += (tgtY - curY) * DAMP;
-    curLift += (tgtLift - curLift) * DAMP;
-    card.style.setProperty('--tilt-x', `${curX.toFixed(2)}deg`);
-    card.style.setProperty('--tilt-y', `${curY.toFixed(2)}deg`);
-    card.style.setProperty('--lift-y', `${curLift.toFixed(2)}px`);
-    raf = requestAnimationFrame(tick);
-  }
-  raf = requestAnimationFrame(tick);
-
-  return {
-    destroy() {
-      cancelAnimationFrame(raf);
-      card.removeEventListener('pointermove', onMove);
-      card.removeEventListener('pointerenter', onMove);
-      card.removeEventListener('pointerleave', onLeave);
-    },
-  };
-}
 
 // ---------- Hide tray scroll shadow on overflow ----------
 

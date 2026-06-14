@@ -30,6 +30,8 @@ export function mountGlowRipple(container) {
   let pointerX = 0.5, pointerY = 0.5;
   let pointerInside = false;
   let lastSpawnT = 0;
+  let lastAutoT = 0;
+  let autoAngle = 0;
   // Spawn on move with throttling — feels like a continuous trail.
   function spawn(x, y) {
     if (ripples.length >= MAX_RIPPLES) ripples.shift();
@@ -72,6 +74,16 @@ export function mountGlowRipple(container) {
     for (const r of ripples) r.t += dt;
     for (let i = ripples.length - 1; i >= 0; i--) {
       if (ripples[i].t > life) ripples.splice(i, 1);
+    }
+    // Auto-spinner: when untouched, ripples spawn in a spinning pattern.
+    autoAngle += dt * 2.2;  // pinwheel speed
+    lastAutoT += dt;
+    if (lastAutoT > 0.18) {
+      lastAutoT = 0;
+      const r = 0.18 + 0.10 * Math.sin(autoAngle * 0.6);
+      const x = 0.5 + Math.cos(autoAngle) * r;
+      const y = 0.5 + Math.sin(autoAngle) * r * 0.7;
+      spawn(x, y);
     }
     render();
     requestAnimationFrame(tick);

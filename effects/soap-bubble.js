@@ -174,9 +174,11 @@ export function mountSoapBubble(container) {
 
     mesh.position.x = cur.x * 0.6;
     mesh.position.y = drift + cur.y * 0.6;
-    mesh.rotation.y = t * 0.25;
-    mesh.rotation.x = Math.sin(t * 0.3) * 0.15;
-    mesh.scale.setScalar(0.95 + 0.08 * Math.sin(t * 0.9));
+    // Active spin like a pinwheel — multiple axes, fast.
+    mesh.rotation.y = t * 0.6;
+    mesh.rotation.x = Math.sin(t * 0.5) * 0.4;
+    mesh.rotation.z = t * 0.25;
+    mesh.scale.setScalar(0.92 + 0.10 * Math.sin(t * 1.2));
 
     uniforms.uTime.value = t;
     uniforms.uFade.value = fade;
