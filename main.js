@@ -1,9 +1,7 @@
 // main.js — Bootstrap for Gia's fidget website.
-// 1. Mounts the ambient background.
-// 2. Wires the chip tray to spawn effect cards.
-// 3. Each spawned card is draggable by its handle bar.
-// 4. First-card-spawned fades out the "tap a glow below" prompt.
-// 5. Orchestrates: audio, symmetry, passive mode, save gesture, variants, AI names, perf monitor.
+// 1. Mounts the ambient background + orb cursor.
+// 2. Radial menu spawns draggable effect entities.
+// 3. Effects explode on fast fling or double-tap.
 
 import { mountBackground } from './ambient/background.js';
 import { mountFluidGoo }     from './effects/fluid-goo.js';
@@ -17,26 +15,9 @@ import { mountNeverGiveUp }  from './effects/never-give-up.js';
 import { mountSandPour }     from './effects/sand-pour.js';
 import { mountChill3D }      from './effects/chill-3d.js';
 import { makeFreeTransform } from './lib/free-transform.js';
-import { isDocumentVisible } from './lib/visibility.js';
-import { createSymmetryController } from './lib/symmetry-controller.js';
-import { makeSaveGesture }   from './lib/save-gesture.js';
-import { createPassiveMode } from './lib/passive-mode.js';
-import { generateName, generateVibeTag } from './lib/ai-names.js';
-import { createPerfMonitor, capEffects } from './lib/perf-monitor.js';
-import { AudioEngine }      from './audio/engine.js';
-
-const EFFECT_LABELS = {
-  'fluid-goo':     'Goo',
-  'soap-bubble':   'Bubble',
-  'petal-drift':   'Petals',
-  'aurora-ribbon': 'Aurora',
-  'galaxy':        'Galaxy',
-  'glow-ripple':   'Ripple',
-  'love-note':     'Love',
-  'never-give-up': 'Hope',
-  'sand-pour':     'Sand',
-  'chill-3d':      'Dreamscape',
-};
+import { mountOrbCursor }    from './lib/orb-cursor.js';
+import { mountRadialMenu }   from './lib/radial-menu.js';
+import { createExplosion }   from './lib/party-explosion.js';
 
 const EFFECT_MOUNT = {
   'fluid-goo':     mountFluidGoo,
@@ -51,134 +32,57 @@ const EFFECT_MOUNT = {
   'chill-3d':      mountChill3D,
 };
 
-// Variant definitions: each effect → array of variant names.
-const EFFECT_VARIANTS = {
-  'fluid-goo':     ['Sunset', 'Lagoon', 'Lavender', 'Mint', 'Sand'],
-  'soap-bubble':   ['Rainbow', 'Frost', 'Rose', 'Ocean'],
-  'petal-drift':   ['Sakura', 'Rose', 'Lavender', 'Autumn'],
-  'aurora-ribbon': ['Northern', 'Sunset', 'Ocean', 'Forest'],
-  'galaxy':        ['Spiral', 'Cluster', 'Nebula', 'Void'],
-  'glow-ripple':   ['Calm', 'Rainbow', 'Soft', 'Pulse'],
-  'love-note':     ['Classic', 'Playful', 'Tender'],
-  'never-give-up': ['Classic', 'Bold', 'Gentle'],
-  'sand-pour':     ['Warm', 'Pastel', 'Neon', 'Earth', 'Ocean'],
-  'chill-3d':      ['Meadow', 'Sunset', 'Twilight', 'Ocean', 'Lavender'],
+const EFFECT_LABELS = {
+  'fluid-goo':     'Goo',
+  'soap-bubble':   'Bubble',
+  'petal-drift':   'Petals',
+  'aurora-ribbon': 'Aurora',
+  'galaxy':        'Galaxy',
+  'glow-ripple':   'Ripple',
+  'love-note':     'Love',
+  'never-give-up': 'Hope',
+  'sand-pour':     'Sand',
+  'chill-3d':      'Dreamscape',
 };
 
 const WORD_EFFECTS = new Set(['love-note', 'never-give-up']);
-const CANVAS_EFFECTS = new Set(['fluid-goo', 'soap-bubble', 'petal-drift', 'aurora-ribbon', 'galaxy', 'glow-ripple', 'sand-pour', 'chill-3d']);
-const MIRRORABLE_EFFECTS = new Set(['sand-pour', 'aurora-ribbon', 'galaxy', 'glow-ripple']);
+
+const RADIAL_KEY_MAP = {
+  'goo':     'fluid-goo',
+  'bubble':  'soap-bubble',
+  'petals':  'petal-drift',
+  'aurora':  'aurora-ribbon',
+  'galaxy':  'galaxy',
+  'ripple':  'glow-ripple',
+  'sand':    'sand-pour',
+  '3d':      'chill-3d',
+  'love':    'love-note',
+  'hope':    'never-give-up',
+};
 
 // ---------- Ambient background ----------
 
 const ambientCanvas = document.getElementById('ambient-canvas');
-const ambient = mountBackground(ambientCanvas);
+mountBackground(ambientCanvas);
 
-// ---------- Audio engine ----------
+// ---------- Orb cursor ----------
 
-const audioEngine = new AudioEngine();
+mountOrbCursor();
 
-// ---------- Symmetry controller ----------
+// ---------- Effect count ----------
 
-const symmetry = createSymmetryController();
-
-// ---------- Perf monitor ----------
-
-const perfMonitor = createPerfMonitor();
-
-// ---------- Passive mode ----------
-
-const passiveMode = createPassiveMode({
-  onPassive() {
-    if (isWelcomeVisible) return;
-    document.body.classList.add('passive');
-    ambient.setSpeed(0.2);
-    audioEngine.swellAmbient();
-  },
-  onActive() {
-    document.body.classList.remove('passive');
-    ambient.setSpeed(1.0);
-    audioEngine.restoreAmbientVolume();
-  },
-});
-
-// ---------- Spawn + draggable cards ----------
-
+let effectCount = 0;
 const stage = document.getElementById('effects-stage');
-const tray = document.getElementById('chip-tray-inner');
-let cardIndex = 0;
+const emptyState = document.getElementById('empty-state');
 
-// Track spawned cards for variant cycling and effect capping.
-const spawnedCards = []; // { card, ft, effectKey, variant }
-
-// ---------- Welcome card ----------
-let isWelcomeVisible = false;
-let welcomeCardEl = null;
-let welcomeDismissTimer = null;
-
-function initWelcomeCard() {
-  if (sessionStorage.getItem('gia-welcome-dismissed')) return;
-  welcomeCardEl = document.getElementById('welcome-card');
-  if (!welcomeCardEl) return;
-  isWelcomeVisible = true;
-
-  const btn = welcomeCardEl.querySelector('.welcome-btn');
-  btn.addEventListener('click', dismissWelcomeCard);
-}
-
-function dismissWelcomeCard() {
-  if (!isWelcomeVisible || !welcomeCardEl) return;
-  isWelcomeVisible = false;
-  welcomeCardEl.classList.add('dismissing');
-  sessionStorage.setItem('gia-welcome-dismissed', '1');
-  clearTimeout(welcomeDismissTimer);
-  welcomeDismissTimer = setTimeout(() => {
-    welcomeCardEl.remove();
-    welcomeCardEl = null;
-  }, 300);
-  // Show empty state prompt after welcome is dismissed and no cards are on screen.
-  if (spawnedCards.length === 0) {
-    showEmptyState();
+function updateEmptyState() {
+  if (emptyState) {
+    emptyState.classList.toggle('hidden', effectCount > 0);
   }
 }
 
-// ---------- Empty state prompt ----------
-const emptyStatePrompt = document.getElementById('empty-state-prompt');
+// ---------- Toast ----------
 
-function showEmptyState() {
-  if (emptyStatePrompt) emptyStatePrompt.classList.remove('hidden');
-}
-
-function hideEmptyState() {
-  if (emptyStatePrompt) emptyStatePrompt.classList.add('hidden');
-}
-
-// Viewport-aware grid spawn: 2x4 on mobile, 4x2 on desktop (8 slots).
-function nextSpawnPosition() {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const isMobile = vw < 768;
-  const margin = 12;
-  const headerH = 90;
-  const trayH = 110;
-
-  const cols = isMobile ? 2 : 4;
-  const rows = isMobile ? 4 : 2;
-
-  const cardW = Math.floor((vw - margin * (cols + 1)) / cols);
-  const cardH = Math.floor((vh - headerH - trayH - margin * (rows + 1)) / rows);
-
-  const idx = cardIndex++ % (cols * rows);
-  const col = idx % cols;
-  const row = Math.floor(idx / cols);
-
-  const x = margin + col * (cardW + margin);
-  const y = headerH + margin + row * (cardH + margin);
-
-  return { x, y, cardW, cardH };
-}
-
-// Show a floating toast.
 function showToast(text) {
   const toast = document.createElement('div');
   toast.className = 'toast';
@@ -187,393 +91,130 @@ function showToast(text) {
   setTimeout(() => { toast.remove(); }, 1600);
 }
 
-// Get current variant index for an effect chip.
-function getVariantIndex(effectKey) {
-  const chip = tray.querySelector(`.chip[data-effect="${effectKey}"]`);
-  if (!chip) return 0;
-  return parseInt(chip.dataset.variantIndex || '0', 10);
-}
+// ---------- Spawn effect ----------
 
-function setVariantIndex(effectKey, idx) {
-  const chip = tray.querySelector(`.chip[data-effect="${effectKey}"]`);
-  if (!chip) return;
-  chip.dataset.variantIndex = String(idx);
-  const variants = EFFECT_VARIANTS[effectKey];
-  if (variants && variants[idx]) {
-    const label = chip.querySelector('.chip-label');
-    if (label) label.textContent = variants[idx];
-  }
-}
-
-// Cycle variant on a chip (long-press).
-function cycleChipVariant(effectKey) {
-  const variants = EFFECT_VARIANTS[effectKey];
-  if (!variants || variants.length === 0) return;
-  const chip = tray.querySelector(`.chip[data-effect="${effectKey}"]`);
-  if (!chip) return;
-  const current = parseInt(chip.dataset.variantIndex || '0', 10);
-  const next = (current + 1) % variants.length;
-  setVariantIndex(effectKey, next);
-  showToast(`${EFFECT_LABELS[effectKey]}: ${variants[next]}`);
-}
-
-// Cycle variant on a spawned card.
-function cycleCardVariant(card) {
-  const effectKey = card.dataset.effect;
-  const variants = EFFECT_VARIANTS[effectKey];
-  if (!variants || variants.length === 0) return;
-
-  const instance = card._instance;
-  const currentIdx = parseInt(card.dataset.variantIndex || '0', 10);
-  const nextIdx = (currentIdx + 1) % variants.length;
-  const nextName = variants[nextIdx];
-
-  card.dataset.variantIndex = String(nextIdx);
-
-  if (instance && typeof instance.setVariant === 'function') {
-    instance.setVariant(nextName);
-  } else {
-    // Destroy + remount with new variant.
-    const ft = card._ft;
-    const rect = card.getBoundingClientRect();
-    closeCard(card, ft);
-    // Spawn same effect with new variant after short delay.
-    setTimeout(() => {
-      const newCard = makeCard(effectKey, { variant: nextName, variantIndex: nextIdx });
-      if (newCard && ft) {
-        // Approximate position.
-        ft.setTransform(
-          rect.left + rect.width / 2,
-          rect.top + rect.height / 2,
-          1, 0, 0, 0
-        );
-      }
-    }, 200);
-    return;
-  }
-
-  showToast(`${EFFECT_LABELS[effectKey]}: ${nextName}`);
-}
-
-function makeCard(effectKey, opts = {}) {
+function spawnEffect(effectKey) {
   const mount = EFFECT_MOUNT[effectKey];
   if (!mount) return;
 
-  // Cap at 4 visible effects.
-  capEffects(4);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const size = Math.min(280, Math.min(vw, vh) * 0.5);
 
-  const card = document.createElement('div');
-  card.className = 'effect-card' + (WORD_EFFECTS.has(effectKey) ? ' is-word' : '');
-  card.dataset.effect = effectKey;
+  const entity = document.createElement('div');
+  entity.className = 'effect-entity' + (WORD_EFFECTS.has(effectKey) ? ' is-word' : '');
+  entity.style.width = `${size}px`;
+  entity.style.height = `${size}px`;
 
-  const canvas = document.createElement('div');
-  canvas.className = 'effect-canvas';
+  // Random position in viewport.
+  const x = Math.random() * (vw - size);
+  const y = Math.random() * (vh - size);
+  entity.style.left = `${x}px`;
+  entity.style.top = `${y}px`;
 
-  card.appendChild(canvas);
-
-  const { x, y, cardW, cardH } = nextSpawnPosition();
-  const initScale = 0.5 + Math.random() * 0.6;
-  const initRotZ = (Math.random() - 0.5) * 60;
-  const initRotX = (Math.random() - 0.5) * 30;
-  const initRotY = (Math.random() - 0.5) * 30;
-  card.style.left = '0px';
-  card.style.top = '0px';
-  card.style.width = `${cardW}px`;
-  card.style.height = `${cardH}px`;
-  stage.appendChild(card);
-
-  // Determine variant.
-  const variantIdx = opts.variantIndex !== undefined ? opts.variantIndex : getVariantIndex(effectKey);
-  const variants = EFFECT_VARIANTS[effectKey];
-  const variantName = variants ? (variants[variantIdx] || variants[0]) : undefined;
-  card.dataset.variantIndex = String(variantIdx);
-
-  // Mount effect with options.
-  const mountOpts = {};
-  if (variantName) mountOpts.variant = variantName;
-  if (symmetry.getMode() > 0 && MIRRORABLE_EFFECTS.has(effectKey)) {
-    mountOpts.symmetryMode = symmetry.getMode();
-  }
-  const instanceOrPromise = mount(canvas, mountOpts);
+  // Mount effect inside.
+  const instanceOrPromise = mount(entity);
   Promise.resolve(instanceOrPromise).then(instance => {
-    if (!instance) return;
-    card._instance = instance;
+    if (instance) entity._instance = instance;
   });
 
-  // Free transform.
-  const ft = makeFreeTransform(card, {
-    onDoubleTap: () => closeCard(card, ft),
+  // Dragging state.
+  let isDragging = false;
+  entity.addEventListener('pointerdown', () => {
+    isDragging = true;
+    entity.classList.add('dragging');
   });
-  ft.setTransform(
-    x + cardW / 2, y + cardH / 2,
-    initScale, initRotZ, initRotX, initRotY
-  );
-  card._ft = ft;
+  entity.addEventListener('pointerup', () => {
+    isDragging = false;
+    entity.classList.remove('dragging');
+  });
+  entity.addEventListener('pointercancel', () => {
+    isDragging = false;
+    entity.classList.remove('dragging');
+  });
 
-  // Long-press on card for variant cycling (800ms).
-  let cardLongPressTimer = null;
-  let cardDownX = 0, cardDownY = 0;
-  function onCardDown(e) {
-    cardDownX = e.clientX;
-    cardDownY = e.clientY;
-    cardLongPressTimer = setTimeout(() => {
-      cycleCardVariant(card);
-    }, 800);
-  }
-  function onCardMove(e) {
-    if (Math.hypot(e.clientX - cardDownX, e.clientY - cardDownY) > 20) {
-      clearTimeout(cardLongPressTimer);
-      cardLongPressTimer = null;
-      // Cancel gesture tooltip on drag.
-      if (card._gestureTooltipTimer) {
-        clearTimeout(card._gestureTooltipTimer);
-        card._gestureTooltipTimer = null;
+  // Word effects: tap for hearts/stars explosion.
+  if (WORD_EFFECTS.has(effectKey)) {
+    let tapStartX = 0, tapStartY = 0, tapTime = 0;
+    entity.addEventListener('pointerdown', (e) => {
+      tapStartX = e.clientX;
+      tapStartY = e.clientY;
+      tapTime = performance.now();
+    });
+    entity.addEventListener('pointerup', (e) => {
+      const elapsed = performance.now() - tapTime;
+      const dist = Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY);
+      if (elapsed < 280 && dist < 10) {
+        const preset = effectKey === 'love-note' ? 'hearts' : 'stars';
+        createExplosion(entity, size / 2, size / 2, preset, 1);
       }
-    }
+    });
   }
-  function onCardUp() {
-    clearTimeout(cardLongPressTimer);
-    cardLongPressTimer = null;
-  }
-  card._cardLongPress = { onCardDown, onCardMove, onCardUp, onCardCancel: onCardUp };
-  card.addEventListener('pointerdown', onCardDown);
-  card.addEventListener('pointermove', onCardMove);
-  card.addEventListener('pointerup', onCardUp);
-  card.addEventListener('pointercancel', onCardUp);
 
-  // Audio: interaction sounds (named handlers so closeCard can remove them).
-  function onCardPointerDown() {
-    audioEngine.playDragTone();
-    audioEngine.startAmbientBed();
-  }
-  function onCardPointerUp() {
-    audioEngine.playReleaseTone();
-  }
-  card._audioHandlers = { onCardPointerDown, onCardPointerUp };
-  card.addEventListener('pointerdown', onCardPointerDown, { passive: true });
-  card.addEventListener('pointerup', onCardPointerUp, { passive: true });
-
-  // Save gesture.
-  const saveGesture = makeSaveGesture(card, () => {
-    // Return the canvas element inside the card.
-    const c = card.querySelector('canvas');
-    return c || null;
-  }, {
-    filename: `gia-effect-${effectKey}-${Date.now()}.png`,
+  // Free transform with explosion + bounce feedback.
+  const ft = makeFreeTransform(entity, {
+    onDoubleTap: () => explodeAndRemove(entity, ft),
+    onExplosion: (speed) => {
+      createExplosion(entity, size / 2, size / 2, 'confetti', Math.min(speed / 8, 3));
+    },
+    onBounce: () => {
+      entity.style.filter = 'drop-shadow(0 0 30px rgba(167, 139, 250, 0.6))';
+      setTimeout(() => { entity.style.filter = ''; }, 300);
+    },
   });
-  card._saveGesture = saveGesture;
 
-  // Track for capping.
-  spawnedCards.push({ card, ft, effectKey });
+  // Random initial rotation.
+  const initRot = (Math.random() - 0.5) * 40;
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  ft.setTransform(cx, cy, 1, initRot, 0, 0);
 
-  // Hide empty state prompt when first card spawns.
-  if (spawnedCards.length === 1 && !isWelcomeVisible) {
-    hideEmptyState();
-  }
+  stage.appendChild(entity);
 
-  // Mount animation.
+  // Spring-in animation.
+  entity.style.opacity = '0';
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      card.classList.add('mounted');
+      entity.style.transition = 'opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      entity.style.opacity = '1';
     });
   });
 
-  // Gesture tooltip (a5) — after mount animation rAF.
-  if (!WORD_EFFECTS.has(effectKey) && !sessionStorage.getItem('gia-gesture-hint-shown')) {
-    card._gestureTooltipTimer = setTimeout(() => {
-      if (card._gestureTooltipTimer === null) return; // cancelled
-      const tooltip = document.createElement('div');
-      tooltip.className = 'gesture-tooltip';
-      tooltip.textContent = 'Hold to change · Double-tap to close';
-      card.appendChild(tooltip);
-      sessionStorage.setItem('gia-gesture-hint-shown', '1');
-      // Auto-fade after 4s.
-      card._gestureFadeTimer = setTimeout(() => {
-        tooltip.classList.add('fading-out');
-        setTimeout(() => { tooltip.remove(); }, 400);
-      }, 4000);
-    }, 3000);
-  }
+  effectCount++;
+  updateEmptyState();
+  showToast(EFFECT_LABELS[effectKey] || effectKey);
 
-  // AI name toast.
-  const aiName = generateName(effectKey, variantIdx);
-  showToast(aiName);
-
-  // If 3D scene, fade ambient.
-  if (effectKey === 'chill-3d') {
-    ambient.setOpacity(0.5);
-  }
-
-  return card;
+  return entity;
 }
 
-function closeCard(card, ft) {
-  if (card.classList.contains('closing')) return;
-  card.classList.add('closing');
+// ---------- Explode and remove ----------
 
-  // Clean up save gesture.
-  if (card._saveGesture) {
-    card._saveGesture.destroy();
-    card._saveGesture = null;
-  }
+function explodeAndRemove(entity, ft) {
+  const rect = entity.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
 
-  // Remove long-press listeners.
-  if (card._cardLongPress) {
-    card.removeEventListener('pointerdown', card._cardLongPress.onCardDown);
-    card.removeEventListener('pointermove', card._cardLongPress.onCardMove);
-    card.removeEventListener('pointerup', card._cardLongPress.onCardUp);
-    card.removeEventListener('pointercancel', card._cardLongPress.onCardCancel);
-    card._cardLongPress = null;
-  }
+  createExplosion(entity, cx, cy, 'bigBang', 2);
 
-  // Remove audio listeners.
-  if (card._audioHandlers) {
-    card.removeEventListener('pointerdown', card._audioHandlers.onCardPointerDown);
-    card.removeEventListener('pointerup', card._audioHandlers.onCardPointerUp);
-    card._audioHandlers = null;
-  }
-
-  // If 3D scene, restore ambient.
-  if (card.dataset.effect === 'chill-3d') {
-    ambient.setOpacity(1.0);
-  }
-
-  // Remove from tracking.
-  const idx = spawnedCards.findIndex(c => c.card === card);
-  if (idx >= 0) spawnedCards.splice(idx, 1);
-
-  // Show empty state prompt when last card is closed.
-  if (spawnedCards.length === 0) {
-    showEmptyState();
-  }
-
-  // Clean up gesture tooltip timers.
-  if (card._gestureTooltipTimer) {
-    clearTimeout(card._gestureTooltipTimer);
-    card._gestureTooltipTimer = null;
-  }
-  if (card._gestureFadeTimer) {
-    clearTimeout(card._gestureFadeTimer);
-    card._gestureFadeTimer = null;
-  }
+  entity.style.transition = 'opacity 0.3s ease-out';
+  entity.style.opacity = '0';
 
   setTimeout(() => {
-    try { card._instance && card._instance.destroy && card._instance.destroy(); } catch {}
+    try { entity._instance && entity._instance.destroy && entity._instance.destroy(); } catch {}
     ft && ft.destroy();
-    card.remove();
-  }, 420);
+    entity.remove();
+    effectCount--;
+    updateEmptyState();
+  }, 350);
 }
 
-// ---------- Chip tray: click + long-press for variant cycling ----------
+// ---------- Radial menu ----------
 
-// Long-press detection on chips (600ms).
-const chipLongPressTimers = new Map();
-
-tray.addEventListener('pointerdown', e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  const key = chip.dataset.effect;
-  if (!key) return;
-
-  chip.classList.add('chip-tap-feedback');
-
-  const timer = setTimeout(() => {
-    if (EFFECT_VARIANTS[key]) {
-      cycleChipVariant(key);
-    }
-    chipLongPressTimers.delete(key);
-  }, 600);
-  chipLongPressTimers.set(key, timer);
+mountRadialMenu((key) => {
+  const effectKey = RADIAL_KEY_MAP[key];
+  if (effectKey) spawnEffect(effectKey);
 });
 
-tray.addEventListener('pointerup', e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  const key = chip.dataset.effect;
-  if (!key) return;
-  clearTimeout(chipLongPressTimers.get(key));
-  chipLongPressTimers.delete(key);
-  chip.classList.remove('chip-tap-feedback');
-});
+// ---------- Init ----------
 
-tray.addEventListener('pointerleave', e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  const key = chip.dataset.effect;
-  if (!key) return;
-  clearTimeout(chipLongPressTimers.get(key));
-  chipLongPressTimers.delete(key);
-  chip.classList.remove('chip-tap-feedback');
-});
-
-tray.addEventListener('click', e => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  const key = chip.dataset.effect;
-  if (!key) return;
-
-  // Dismiss welcome card on any chip tap before normal action.
-  if (isWelcomeVisible) {
-    dismissWelcomeCard();
-  }
-
-  // Handle special chips.
-  if (key === 'symmetry-toggle') {
-    const mode = symmetry.toggle();
-    const label = chip.querySelector('.chip-label');
-    if (label) label.textContent = mode === 0 ? 'Mirror' : `Mirror ${mode}`;
-    chip.classList.toggle('active', mode > 0);
-    return;
-  }
-
-  if (key === 'audio-mute') {
-    const muted = audioEngine.toggleMute();
-    const label = chip.querySelector('.chip-label');
-    if (label) label.textContent = muted ? 'Muted' : 'Audio';
-    chip.classList.toggle('active', muted);
-    return;
-  }
-
-  // Spawn effect card.
-  makeCard(key);
-});
-
-// ---------- Hide tray scroll shadow on overflow ----------
-
-function checkTrayOverflow() {
-  if (!tray) return;
-  tray.style.overflowX = tray.scrollWidth > tray.clientWidth ? 'auto' : 'hidden';
-}
-window.addEventListener('resize', checkTrayOverflow);
-window.setTimeout(checkTrayOverflow, 200);
-
-// ---------- Tab visibility ----------
-
-document.addEventListener('visibilitychange', () => {
-  // Each effect's RAF pauses itself; nothing to do here globally.
-});
-
-// ---------- Done. The room is alive. ----------
-
-if (isDocumentVisible()) {
-  // No-op — everything is already running.
-}
-
-// ---------- Usability overhaul: init ----------
-
-// Initialize welcome card.
-initWelcomeCard();
-
-// Show empty state prompt if welcome is dismissed and no cards.
-if (!isWelcomeVisible) {
-  showEmptyState();
-}
-
-// First chip pulse: add pulsing glow to Goo chip.
-const firstChip = document.querySelector('.chip[data-effect="fluid-goo"]');
-if (firstChip) firstChip.classList.add('chip-first-pulse');
-
-// Remove first-chip pulse on any chip click.
-tray.addEventListener('click', () => {
-  if (firstChip) firstChip.classList.remove('chip-first-pulse');
-});
+updateEmptyState();
