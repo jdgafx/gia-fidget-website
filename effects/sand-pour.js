@@ -1,5 +1,3 @@
-// effects/sand-pour.js — Cellular automata falling sand simulator in Canvas2D
-
 export function mountSandPour(container, opts = {}) {
   const canvas = document.createElement('canvas');
   canvas.style.width = '100%';
@@ -11,30 +9,29 @@ export function mountSandPour(container, opts = {}) {
   let animationFrameId = null;
   let active = true;
 
-  const WIDTH = 180;
-  const HEIGHT = 180;
+  const WIDTH = 400;
+  const HEIGHT = 400;
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
-  // Sand grid configuration
-  const COLS = 60;
-  const ROWS = 60;
-  const CELL_W = WIDTH / COLS;
-  const CELL_H = HEIGHT / ROWS;
+  // 200x200 grid for incredibly fine grain detail
+  const COLS = 200;
+  const ROWS = 200;
+  
+  // Fast raw typed array for performance (0 = empty, 1..360 = hue value)
+  let grid = new Uint16Array(COLS * ROWS);
 
-  // Grid containing HSL color strings or null
-  let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  // Fast ImageData buffer writing
+  const imgData = ctx.createImageData(WIDTH, HEIGHT);
+  const buffer32 = new Uint32Array(imgData.data.buffer);
 
-  const sandColors = [
-    'hsl(16, 85%, 80%)',  // peach
-    'hsl(265, 70%, 82%)', // lavender
-    'hsl(144, 60%, 80%)', // mint
-    'hsl(208, 80%, 82%)'  // sky
-  ];
+  const variant = opts.variant || 'Desert Sand';
+  let mouse = { x: 100, y: 10, active: false };
+  let pourHue = 0;
 
-  let currentHueIndex = 0;
-
-  let mouse = { x: 30, y: 5, active: false };
+  // Momentum velocity shifts (sloshing physics)
+  let shiftX = 0;
+  let shiftY = 0;
 
   function updateMousePos(e) {
     const rect = canvas.getBoundingClientRect();
@@ -47,7 +44,6 @@ export function mountSandPour(container, opts = {}) {
   function onPointerDown(e) {
     mouse.active = true;
     updateMousePos(e);
-    currentHueIndex = (currentHueIndex + 1) % sandColors.length;
   }
 
   function onPointerMove(e) {
@@ -62,40 +58,176 @@ export function mountSandPour(container, opts = {}) {
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('pointerup', onPointerUp, { passive: true });
 
-  // Clear bottom row slowly to make the sand flow infinitely
-  function drainSand() {
+  // Slowly drain bottom cells to keep simulation infinite
+  function drainBottom() {
+    const startY = ROWS - 1;
     for (let x = 0; x < COLS; x++) {
-      if (Math.random() < 0.08) {
-        grid[ROWS - 1][x] = null;
+      if (Math.random() < 0.10) {
+        grid[startY * COLS + x] = 0;
+      }
+    }
+  }
+
+  // Convert HSL to 32-bit ABGR (little endian format for canvas pixel buffer)
+  function hslToABGR(h, s, l) {
+    s /= 100;
+    l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    
+    const r = Math.round(f(0) * 255);
+    const g = Math.round(f(8) * 255);
+    const b = Math.round(f(4) * 255);
+    
+    return 0xFF000000 | (b << 16) | (g << 8) | r;
+  }
+
+  // Get sand grain colors per theme with coordinate-based texture noise
+  function getSandColorABGR(val, x, y) {
+    const grainNoise = ((x * 17 + y * 23) % 13) - 6; // stable per-grain sparkle (-6% to +6% lightness)
+    
+    if (variant === 'Desert Sand') {
+      const h = 15 + (val % 30); // 15 to 45 (peach to gold)
+      const s = 65 + (val % 5);
+      const l = Math.max(30, Math.min(85, 60 + grainNoise + (val % 10)));
+      return hslToABGR(h, s, l);
+    } 
+    else if (variant === 'Ocean Dunes') {
+      const h = 170 + (val % 80); // 170 to 250 (aquamarine to blue)
+      const s = 60 + (val % 10);
+      const l = Math.max(30, Math.min(85, 62 + grainNoise + (val % 8)));
+      return hslToABGR(h, s, l);
+    } 
+    else if (variant === 'Neon Sand') {
+      const h = (val * 2) % 360; // full rainbow spectrum
+      const s = 70;
+      const l = Math.max(30, Math.min(90, 65 + grainNoise));
+      return hslToABGR(h, s, l);
+    } 
+    else {
+      // Volcanic Ash (deep grey charcoal + embers)
+      const isEmber = (val % 9) < 2;
+      if (isEmber) {
+        const h = (val % 2 === 0) ? 12 : 32; // hot lava orange
+        const s = 70;
+        const l = Math.max(50, Math.min(90, 72 + grainNoise));
+        return hslToABGR(h, s, l);
+      } else {
+        const h = 260 + (val % 25); // dark violet ash
+        const s = 25 + (val % 10);
+        const l = Math.max(10, Math.min(45, 26 + grainNoise));
+        return hslToABGR(h, s, l);
       }
     }
   }
 
   function updatePhysics() {
-    // Traverse from bottom to top to calculate falling sand
+    // Determine movement force shifts
+    let forceSlideX = 0;
+    if (shiftX > 0.15 && Math.random() < Math.min(0.85, shiftX * 0.25)) {
+      forceSlideX = 1;
+    } else if (shiftX < -0.15 && Math.random() < Math.min(0.85, -shiftX * 0.25)) {
+      forceSlideX = -1;
+    }
+
+    let forceSlideY = 0;
+    if (shiftY < -0.15 && Math.random() < Math.min(0.6, -shiftY * 0.2)) {
+      forceSlideY = -1;
+    } else if (shiftY > 0.15 && Math.random() < Math.min(0.6, shiftY * 0.2)) {
+      forceSlideY = 1;
+    }
+
+    // Decelerate velocities
+    shiftX *= 0.88;
+    shiftY *= 0.88;
+
+    const xIndices = Array.from({ length: COLS }, (_, i) => i);
+    
+    // Process bottom to top
     for (let y = ROWS - 2; y >= 0; y--) {
-      for (let x = 0; x < COLS; x++) {
-        const color = grid[y][x];
-        if (color) {
-          // Check straight down
-          if (!grid[y + 1][x]) {
-            grid[y + 1][x] = color;
-            grid[y][x] = null;
+      if (Math.random() < 0.5) xIndices.reverse();
+
+      for (let i = 0; i < COLS; i++) {
+        const x = xIndices[i];
+        const idx = y * COLS + x;
+        const color = grid[idx];
+
+        if (color !== 0) {
+          // Apply inertial slosh upwards
+          if (forceSlideY === -1 && y > 0 && grid[idx - COLS] === 0 && Math.random() < 0.4) {
+            grid[idx - COLS] = color;
+            grid[idx] = 0;
+            continue;
+          }
+
+          // Apply inertial slosh sideways
+          if (forceSlideX === 1 && x < COLS - 1 && grid[idx + 1] === 0) {
+            grid[idx + 1] = color;
+            grid[idx] = 0;
+            continue;
+          } else if (forceSlideX === -1 && x > 0 && grid[idx - 1] === 0) {
+            grid[idx - 1] = color;
+            grid[idx] = 0;
+            continue;
+          }
+
+          const below = idx + COLS;
+          
+          // Straight down
+          if (grid[below] === 0) {
+            grid[below] = color;
+            grid[idx] = 0;
           } else {
-            // Check diagonal left and right
-            const leftEmpty = x > 0 && !grid[y + 1][x - 1];
-            const rightEmpty = x < COLS - 1 && !grid[y + 1][x + 1];
+            // Slope slide down diagonals
+            const belowL = below - 1;
+            const belowR = below + 1;
+            const leftEmpty = x > 0 && grid[belowL] === 0;
+            const rightEmpty = x < COLS - 1 && grid[belowR] === 0;
 
             if (leftEmpty && rightEmpty) {
               const dir = Math.random() < 0.5 ? -1 : 1;
-              grid[y + 1][x + dir] = color;
-              grid[y][x] = null;
+              grid[below + dir] = color;
+              grid[idx] = 0;
             } else if (leftEmpty) {
-              grid[y + 1][x - 1] = color;
-              grid[y][x] = null;
+              grid[belowL] = color;
+              grid[idx] = 0;
             } else if (rightEmpty) {
-              grid[y + 1][x + 1] = color;
-              grid[y][x] = null;
+              grid[belowR] = color;
+              grid[idx] = 0;
+            } else {
+              // Cascade expansion (check up to 3 cells away horizontally)
+              const below2L = below - 2;
+              const below2R = below + 2;
+              const below3L = below - 3;
+              const below3R = below + 3;
+              
+              const left2Empty = x > 1 && grid[belowL] !== 0 && grid[below2L] === 0;
+              const right2Empty = x < COLS - 2 && grid[belowR] !== 0 && grid[below2R] === 0;
+              const left3Empty = x > 2 && grid[below2L] !== 0 && grid[below3L] === 0;
+              const right3Empty = x < COLS - 3 && grid[below2R] !== 0 && grid[below3R] === 0;
+
+              if (left3Empty && right3Empty) {
+                const dir = Math.random() < 0.5 ? -3 : 3;
+                grid[below + dir] = color;
+                grid[idx] = 0;
+              } else if (left3Empty) {
+                grid[below3L] = color;
+                grid[idx] = 0;
+              } else if (right3Empty) {
+                grid[below3R] = color;
+                grid[idx] = 0;
+              } else if (left2Empty && right2Empty) {
+                const dir = Math.random() < 0.5 ? -2 : 2;
+                grid[below + dir] = color;
+                grid[idx] = 0;
+              } else if (left2Empty) {
+                grid[below2L] = color;
+                grid[idx] = 0;
+              } else if (right2Empty) {
+                grid[below2R] = color;
+                grid[idx] = 0;
+              }
             }
           }
         }
@@ -106,46 +238,59 @@ export function mountSandPour(container, opts = {}) {
   function draw() {
     if (!active) return;
 
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-    // Background
-    ctx.fillStyle = 'rgba(15, 10, 30, 0.95)';
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-    // Spawn new sand at pointer
+    // Pour sand at cursor
     if (mouse.active) {
-      const color = sandColors[currentHueIndex];
-      // Spawn a tiny cluster
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (Math.random() < 0.6) {
+      pourHue = (pourHue + 1.2) % 360;
+      
+      // Spawn a fine stream of grains
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dy = -3; dy <= 3; dy++) {
+          if (Math.random() < 0.35) {
             const sx = mouse.x + dx;
             const sy = mouse.y + dy;
             if (sx >= 0 && sx < COLS && sy >= 0 && sy < ROWS) {
-              grid[sy][sx] = color;
+              grid[sy * COLS + sx] = Math.round(pourHue) || 1;
             }
           }
         }
       }
-      
-      if (window.audioEngineInstance && Math.random() < 0.1) {
+
+      if (window.audioEngineInstance && Math.random() < 0.15) {
         window.audioEngineInstance.playInteractionTone();
       }
     }
 
     updatePhysics();
-    drainSand();
+    drainBottom();
 
-    // Render cells
+    // Fast rendering directly into the ABGR buffer32 array
+    const bgABGR = 0xFF18080C; // background #0c0818 with alpha=FF in ABGR format
+    buffer32.fill(bgABGR);
+
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
-        const color = grid[y][x];
-        if (color) {
-          ctx.fillStyle = color;
-          ctx.fillRect(x * CELL_W, y * CELL_H, CELL_W + 0.5, CELL_H + 0.5); // +0.5 to avoid gaps
+        const val = grid[y * COLS + x];
+        if (val !== 0) {
+          const colorABGR = getSandColorABGR(val, x, y);
+          
+          // Draw a 2x2 canvas pixel block for each cell
+          const px = x * 2;
+          const py = y * 2;
+          
+          const idx00 = py * WIDTH + px;
+          const idx01 = idx00 + 1;
+          const idx10 = idx00 + WIDTH;
+          const idx11 = idx10 + 1;
+          
+          buffer32[idx00] = colorABGR;
+          buffer32[idx01] = colorABGR;
+          buffer32[idx10] = colorABGR;
+          buffer32[idx11] = colorABGR;
         }
       }
     }
+
+    ctx.putImageData(imgData, 0, 0);
 
     animationFrameId = requestAnimationFrame(draw);
   }
@@ -153,6 +298,16 @@ export function mountSandPour(container, opts = {}) {
   draw();
 
   return {
+    onPhysicsUpdate(vx, vy, angle) {
+      // Rotate screen-coordinate velocity back into local container space
+      const rad = -angle * Math.PI / 180;
+      const rx = vx * Math.cos(rad) - vy * Math.sin(rad);
+      const ry = vx * Math.sin(rad) + vy * Math.cos(rad);
+      
+      // Accumulate forces (opposite direction of motion for physical feel)
+      shiftX = -rx * 0.15;
+      shiftY = -ry * 0.15;
+    },
     destroy() {
       active = false;
       cancelAnimationFrame(animationFrameId);

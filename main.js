@@ -158,16 +158,17 @@ function spawnArtifact(effectKey, startX, startY, isPartner = false, mirrorClass
   }
 
   // Dimension sizing
-  const size = WORD_EFFECTS.has(effectKey) ? 170 : 150;
-  artifact.style.width = `${size}px`;
-  artifact.style.height = WORD_EFFECTS.has(effectKey) ? '100px' : `${size}px`;
+  const w = WORD_EFFECTS.has(effectKey) ? 280 : 260;
+  const h = WORD_EFFECTS.has(effectKey) ? 160 : 260;
+  artifact.style.width = `${w}px`;
+  artifact.style.height = `${h}px`;
 
   // Random position on playground
-  const x = startX !== undefined ? startX : Math.random() * (window.innerWidth - size - 40) + size / 2 + 20;
-  const y = startY !== undefined ? startY : Math.random() * (window.innerHeight - size - 160) + size / 2 + 85;
+  const x = startX !== undefined ? startX : Math.random() * (window.innerWidth - w - 40) + w / 2 + 20;
+  const y = startY !== undefined ? startY : Math.random() * (window.innerHeight - h - 160) + h / 2 + 85;
 
-  artifact.style.left = `${x - size / 2}px`;
-  artifact.style.top = `${y - (WORD_EFFECTS.has(effectKey) ? 50 : size / 2)}px`;
+  artifact.style.left = `${x - w / 2}px`;
+  artifact.style.top = `${y - h / 2}px`;
 
   // Mount effect inside artifact container
   const mountFunc = EFFECT_MOUNTS[effectKey];
@@ -194,17 +195,24 @@ function spawnArtifact(effectKey, startX, startY, isPartner = false, mirrorClass
 
   if (!isPartner) {
     transformInstance = makeFreeTransform(artifact, {
-      onMove: (cx, cy, speed) => {
+      onTransform: (cx, cy, scale, angle, speed, vx, vy) => {
         // Spawn trail sparkles
-        const count = Math.min(6, Math.max(1, Math.floor(speed * 0.4)));
-        for (let i = 0; i < count; i++) {
-          trails.spawn(cx + (Math.random() - 0.5) * 15, cy + (Math.random() - 0.5) * 15, trailColor);
+        if (speed > 0.4) {
+          const count = Math.min(6, Math.max(1, Math.floor(speed * 0.4)));
+          for (let i = 0; i < count; i++) {
+            trails.spawn(cx + (Math.random() - 0.5) * 15, cy + (Math.random() - 0.5) * 15, trailColor);
+          }
         }
 
-        // Sync positions of symmetrical partners
+        // Sync positions, scales, rotations, and physics of symmetrical partners
         const artifactInfo = activeArtifacts.get(artifactId);
-        if (artifactInfo && artifactInfo.partners) {
-          syncPartners(cx, cy, size, WORD_EFFECTS.has(effectKey) ? 100 : size, artifactInfo.partners);
+        if (artifactInfo) {
+          if (artifactInfo.effectInstance && artifactInfo.effectInstance.onPhysicsUpdate) {
+            artifactInfo.effectInstance.onPhysicsUpdate(vx, vy, angle);
+          }
+          if (artifactInfo.partners) {
+            syncPartners(cx, cy, w, h, artifactInfo.partners, scale, angle, vx, vy);
+          }
         }
       },
       onDoubleTap: () => {
@@ -257,34 +265,53 @@ function spawnArtifact(effectKey, startX, startY, isPartner = false, mirrorClass
     }
   ];
 
-  return { artifactId, artifact, destroyers, w: size, h: WORD_EFFECTS.has(effectKey) ? 100 : size, transform: transformInstance };
+  return { artifactId, artifact, destroyers, w, h, transform: transformInstance, effectInstance };
 }
 
 // Sync partners positions based on symmetry
-function syncPartners(masterX, masterY, w, h, partners) {
+function syncPartners(masterX, masterY, w, h, partners, scale = 1.0, angle = 0, vx = 0, vy = 0) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
   partners.forEach((partner) => {
     let px = masterX;
     let py = masterY;
+    let pa = angle;
+    let pvx = vx;
+    let pvy = vy;
 
     if (partner.mirrorClass === 'mirrored-2') {
       px = vw - masterX;
+      pa = -angle;
+      pvx = -vx;
     } else if (partner.mirrorClass === 'mirrored-4-y') {
       py = vh - masterY;
+      pa = -angle;
+      pvy = -vy;
     } else if (partner.mirrorClass === 'mirrored-4-xy') {
       px = vw - masterX;
       py = vh - masterY;
+      pa = angle;
+      pvx = -vx;
+      pvy = -vy;
     }
 
     // Apply partner transforms
     partner.card.style.left = `${px - w / 2}px`;
     partner.card.style.top = `${py - h / 2}px`;
+    partner.card.style.transform = `scale(${scale}) rotate(${pa}deg)`;
+
+    // Pass physics to partner's effect instance
+    if (partner.effectInstance && partner.effectInstance.onPhysicsUpdate) {
+      partner.effectInstance.onPhysicsUpdate(pvx, pvy, pa);
+    }
     
     // Spawn trails at partner positions too!
     const trailColor = EFFECT_TRAIL_COLORS[partner.card.dataset.effect] || 'rgba(255, 255, 255, 0.8)';
-    trails.spawn(px + (Math.random() - 0.5) * 15, py + (Math.random() - 0.5) * 15, trailColor);
+    const speed = Math.hypot(pvx, pvy);
+    if (speed > 0.4) {
+      trails.spawn(px + (Math.random() - 0.5) * 15, py + (Math.random() - 0.5) * 15, trailColor);
+    }
   });
 }
 
@@ -308,7 +335,7 @@ function spawnCompanion(effectKey) {
     const px = vw - masterX;
     const partner = spawnArtifact(effectKey, px, masterY, true, 'mirrored-2');
     partner.artifact.dataset.effect = effectKey;
-    partners.push({ card: partner.artifact, mirrorClass: 'mirrored-2', destroyers: partner.destroyers });
+    partners.push({ card: partner.artifact, mirrorClass: 'mirrored-2', destroyers: partner.destroyers, effectInstance: partner.effectInstance });
   } else if (mode === 4) {
     const px = vw - masterX;
     const py = vh - masterY;
@@ -321,16 +348,17 @@ function spawnCompanion(effectKey) {
     p3.artifact.dataset.effect = effectKey;
 
     partners.push(
-      { card: p1.artifact, mirrorClass: 'mirrored-2', destroyers: p1.destroyers },
-      { card: p2.artifact, mirrorClass: 'mirrored-4-y', destroyers: p2.destroyers },
-      { card: p3.artifact, mirrorClass: 'mirrored-4-xy', destroyers: p3.destroyers }
+      { card: p1.artifact, mirrorClass: 'mirrored-2', destroyers: p1.destroyers, effectInstance: p1.effectInstance },
+      { card: p2.artifact, mirrorClass: 'mirrored-4-y', destroyers: p2.destroyers, effectInstance: p2.effectInstance },
+      { card: p3.artifact, mirrorClass: 'mirrored-4-xy', destroyers: p3.destroyers, effectInstance: p3.effectInstance }
     );
   }
 
   activeArtifacts.set(masterInfo.artifactId, {
     artifact: masterInfo.artifact,
     partners,
-    destroyers: masterInfo.destroyers
+    destroyers: masterInfo.destroyers,
+    effectInstance: masterInfo.effectInstance
   });
 
   // Toast procedural name
@@ -412,12 +440,26 @@ document.querySelectorAll('.chip').forEach((chip) => {
 
 // Pre-populate viewport with 3 borderless items on load
 window.addEventListener('DOMContentLoaded', () => {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
   setTimeout(() => {
     spawnCompanion('soap-bubble');
     spawnCompanion('petal-drift');
     spawnCompanion('love-note');
   }, 600);
+});
+
+// Global keyboard resizing for the active/hovered artifact
+window.addEventListener('keydown', (e) => {
+  if (!window.activeFidgetArtifact) return;
+  // Avoid intercepting when user is typing in any text fields
+  if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+    return;
+  }
+  
+  if (e.key === '=' || e.key === '+') {
+    e.preventDefault();
+    window.activeFidgetArtifact.zoom(1.08);
+  } else if (e.key === '-' || e.key === '_') {
+    e.preventDefault();
+    window.activeFidgetArtifact.zoom(0.92);
+  }
 });

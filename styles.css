@@ -136,8 +136,8 @@ body {
 /* Floating Independent Artifacts (No cards chrome!) */
 .effect-artifact {
   position: absolute;
-  width: 150px;
-  height: 150px;
+  width: 260px;
+  height: 260px;
   cursor: grab;
   pointer-events: auto;
   opacity: 0;
@@ -174,8 +174,8 @@ body {
 
 /* Words Artifacts - styled a bit wider, oval glass shape for legibility */
 .effect-artifact.is-word {
-  width: 170px;
-  height: 100px;
+  width: 280px;
+  height: 160px;
   border-radius: 40px;
   background: rgba(21, 10, 33, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
