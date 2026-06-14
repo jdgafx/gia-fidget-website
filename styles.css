@@ -1,13 +1,10 @@
-/* styles.css — Soothing Fidget Playground Styling */
+/* styles.css — Calming Borderless Fidget Playground */
 
 :root {
-  --bg-dark: #0d081b;
-  --plum-void: #150a21;
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --bg-dark: #07050f;
   --text-primary: #f0eaff;
-  --text-secondary: rgba(240, 234, 255, 0.65);
-  --accent-neon: #a78bfa; /* Zumies lavender accent */
+  --text-secondary: rgba(240, 234, 255, 0.6);
+  --accent-neon: #a78bfa; /* Zumies neon glow */
   
   --sine-in-out: cubic-bezier(0.445, 0.05, 0.55, 0.95);
 }
@@ -30,11 +27,21 @@ body {
   position: relative;
 }
 
+/* Background & Overlays */
 #ambient-canvas {
   position: fixed;
   inset: 0;
   z-index: -2;
   pointer-events: none;
+}
+
+#trails-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  width: 100vw;
+  height: 100vh;
 }
 
 /* Site Header */
@@ -56,7 +63,7 @@ body {
   font-size: clamp(28px, 6vw, 40px);
   letter-spacing: 0.05em;
   color: var(--text-primary);
-  text-shadow: 0 0 15px rgba(240, 234, 255, 0.45);
+  text-shadow: 0 0 15px rgba(240, 234, 255, 0.35);
 }
 
 .tagline {
@@ -65,7 +72,7 @@ body {
   text-transform: uppercase;
   color: var(--accent-neon);
   margin-top: 4px;
-  text-shadow: 0 0 8px rgba(167, 139, 250, 0.65); /* Zumies neon accent glow */
+  text-shadow: 0 0 8px rgba(167, 139, 250, 0.65); /* Zumies neon glow */
 }
 
 /* Control Panel */
@@ -79,8 +86,8 @@ body {
 }
 
 .icon-btn {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
   padding: 10px;
   border-radius: 50%;
@@ -126,111 +133,54 @@ body {
   pointer-events: none;
 }
 
-/* Companion Fidget Cards */
-.effect-card {
+/* Floating Independent Artifacts (No cards chrome!) */
+.effect-artifact {
   position: absolute;
-  width: 200px;
-  height: 235px;
-  background: rgba(21, 10, 33, 0.7); /* Frosted dark plum background */
-  border: 1px solid var(--glass-border);
-  border-radius: 18px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  width: 150px;
+  height: 150px;
+  cursor: grab;
   pointer-events: auto;
   opacity: 0;
-  transform: scale(0.9);
+  transform: scale(0.9) rotate(0deg);
   transition: opacity 0.5s var(--sine-in-out), transform 0.5s var(--sine-in-out), filter 0.5s var(--sine-in-out);
-  animation: cardBreath 7s var(--sine-in-out) infinite alternate;
+  
+  /* Natural circle overlay styling for organic look */
+  border-radius: 50%;
+  overflow: hidden;
+  
+  /* Soft hope glow */
+  filter: drop-shadow(0 10px 25px rgba(167, 139, 250, 0.25));
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.03);
 }
 
-.effect-card.mounted {
+/* Grabbing cursor states */
+.effect-artifact:active {
+  cursor: grabbing;
+}
+
+.effect-artifact.mounted {
   opacity: 1;
   transform: scale(1);
 }
 
-.effect-card.closing {
+.effect-artifact.closing {
   opacity: 0 !important;
-  transform: scale(0.8) !important;
+  transform: scale(0.7) rotate(15deg) !important;
 }
 
-.effect-card.passive-mode-active {
+.effect-artifact.passive-mode-active {
   opacity: 0.35;
 }
 
-/* Card Breathing Bob Animation */
-@keyframes cardBreath {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-8px);
-  }
-}
-
-/* Card Title Bar */
-.card-header {
-  height: 35px;
-  padding: 0 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: grab;
-}
-
-.card-header:active {
-  cursor: grabbing;
-}
-
-.card-title {
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-  text-transform: capitalize;
-}
-
-.card-close {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.card-close:hover {
-  color: #ff6b9d;
-}
-
-/* Card Content stage */
-.card-content {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Mirroring Symmetry transforms */
-.mirrored-2 {
-  transform: scaleX(-1);
-}
-
-.mirrored-4-y {
-  transform: scaleY(-1);
-}
-
-.mirrored-4-xy {
-  transform: scale(-1);
+/* Words Artifacts - styled a bit wider, oval glass shape for legibility */
+.effect-artifact.is-word {
+  width: 170px;
+  height: 100px;
+  border-radius: 40px;
+  background: rgba(21, 10, 33, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* Chip Tray at the bottom */
@@ -240,7 +190,7 @@ body {
   left: 0;
   right: 0;
   padding: 16px 0 calc(env(safe-area-inset-bottom, 0px) + 16px);
-  background: linear-gradient(180deg, transparent, rgba(13, 8, 27, 0.9) 60%);
+  background: linear-gradient(180deg, transparent, rgba(7, 5, 15, 0.9) 60%);
   display: flex;
   justify-content: center;
   z-index: 100;
@@ -254,17 +204,17 @@ body {
   overflow-x: auto;
   pointer-events: auto;
   max-width: 100%;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
 }
 
 .chip-tray::-webkit-scrollbar {
-  display: none; /* Safari/Chrome */
+  display: none;
 }
 
 .chip {
   flex: 0 0 auto;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border-radius: 20px;
   padding: 8px 16px;
@@ -280,7 +230,7 @@ body {
 
 .chip:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border-color: var(--accent-neon);
 }
 
@@ -291,7 +241,7 @@ body {
 .chip-icon {
   font-size: 16px;
   display: inline-block;
-  filter: drop-shadow(0 0 3px currentColor); /* Zumies neon icon drop shadow */
+  filter: drop-shadow(0 0 3px currentColor); /* Zumies accent neon glow */
 }
 
 .chip-label {
@@ -312,6 +262,17 @@ body {
 .glow-love .chip-icon { color: #f6d365; }
 .glow-hope .chip-icon { color: #fda085; }
 
+/* Symmetry mirrored scales */
+.mirrored-2 {
+  transform: scaleX(-1);
+}
+.mirrored-4-y {
+  transform: scaleY(-1);
+}
+.mirrored-4-xy {
+  transform: scale(-1);
+}
+
 /* Toast notifications */
 #toast-container {
   position: fixed;
@@ -323,8 +284,8 @@ body {
 }
 
 .toast {
-  background: rgba(21, 10, 33, 0.85);
-  border: 1px solid var(--glass-border);
+  background: rgba(15, 10, 30, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   padding: 8px 18px;
   border-radius: 20px;
@@ -360,8 +321,7 @@ body {
 
 /* Reduced Motion Settings */
 @media (prefers-reduced-motion: reduce) {
-  .effect-card {
-    animation: none !important;
+  .effect-artifact {
     transition: none !important;
   }
   .chip {

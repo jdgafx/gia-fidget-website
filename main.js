@@ -17,7 +17,8 @@ import { createSymmetryController } from './lib/symmetry-controller.js';
 import { makeSaveGesture }   from './lib/save-gesture.js';
 import { createPassiveMode } from './lib/passive-mode.js';
 import { generateName }      from './lib/ai-names.js';
-import { makeDraggable }     from './lib/draggable.js';
+import { makeFreeTransform } from './lib/free-transform.js';
+import { initTrailEngine }   from './lib/trails.js';
 
 // Effects map
 const EFFECT_MOUNTS = {
@@ -33,7 +34,7 @@ const EFFECT_MOUNTS = {
   'never-give-up': mountNeverGiveUp
 };
 
-// Named variants per effect (4 variants each)
+// Named variants per effect
 const VARIANTS = {
   'fluid-goo': ['Classic Goo', 'Fast Goo', 'Heavy Goo', 'Swirling Goo'],
   'soap-bubble': ['Soap Bubble', 'Giant Bubble', 'Tiny Bubbles', 'Golden Bubble'],
@@ -47,9 +48,23 @@ const VARIANTS = {
   'never-give-up': ['Never Give Up', 'Stay Strong', 'Brave Heart', 'Bright Future']
 };
 
+// Color mappings for particle trails
+const EFFECT_TRAIL_COLORS = {
+  'fluid-goo': 'rgba(138, 213, 255, 0.85)',
+  'soap-bubble': 'rgba(177, 224, 255, 0.85)',
+  'petal-drift': 'rgba(251, 194, 235, 0.85)',
+  'aurora-ribbon': 'rgba(194, 233, 251, 0.85)',
+  'galaxy': 'rgba(161, 196, 253, 0.85)',
+  'glow-ripple': 'rgba(242, 226, 254, 0.85)',
+  'sand-pour': 'rgba(255, 241, 235, 0.85)',
+  'chill-3d': 'rgba(195, 207, 226, 0.85)',
+  'love-note': 'rgba(246, 211, 101, 0.85)',
+  'never-give-up': 'rgba(253, 160, 133, 0.85)'
+};
+
 // State
-const activeCards = new Map(); // id -> { card, partners, destroyers }
-let cardIdCounter = 0;
+const activeArtifacts = new Map(); // id -> { artifact, partners, destroyers }
+let artifactIdCounter = 0;
 const currentVariants = {}; // effectKey -> index
 
 // Initialize variants
@@ -57,15 +72,19 @@ Object.keys(EFFECT_MOUNTS).forEach((key) => {
   currentVariants[key] = 0;
 });
 
-// Setup Ambient Background
+// Setup Ambient WebGL Background
 const bgCanvas = document.getElementById('ambient-canvas');
 mountBackground(bgCanvas);
 
+// Setup Trail Engine overlay
+const trailsCanvas = document.getElementById('trails-canvas');
+const trails = initTrailEngine(trailsCanvas);
+
 // Setup Audio Engine
 const audioEngine = new AudioEngine();
-window.audioEngineInstance = audioEngine; // Expose globally for effects to play tones
+window.audioEngineInstance = audioEngine;
 
-// Autoplay Context unlock
+// Autoplay context unlock
 function unlockAudio() {
   audioEngine.init();
   window.removeEventListener('pointerdown', unlockAudio);
@@ -77,14 +96,14 @@ const symmetry = createSymmetryController();
 const passive = createPassiveMode({
   delay: 5000,
   onPassive: () => {
-    document.querySelectorAll('.effect-card').forEach((card) => {
-      card.classList.add('passive-mode-active');
+    document.querySelectorAll('.effect-artifact').forEach((art) => {
+      art.classList.add('passive-mode-active');
     });
     audioEngine.swellAmbient();
   },
   onActive: () => {
-    document.querySelectorAll('.effect-card').forEach((card) => {
-      card.classList.remove('passive-mode-active');
+    document.querySelectorAll('.effect-artifact').forEach((art) => {
+      art.classList.remove('passive-mode-active');
     });
     audioEngine.normalizeAmbient();
   }
@@ -108,10 +127,7 @@ symmetryBtn.addEventListener('click', () => {
   const mode = symmetry.toggle();
   symmetryBadge.textContent = mode === 0 ? 'Off' : `${mode}`;
   showToast(`Symmetry: ${mode === 0 ? 'Off' : mode + '-way'}`);
-  
-  if (audioEngine) {
-    audioEngine.playInteractionTone();
-  }
+  audioEngine.playInteractionTone();
 });
 
 // Toast Manager
@@ -126,284 +142,282 @@ function showToast(text) {
   }, 1800);
 }
 
-// Spawns a card
-function spawnCard(effectKey, startX, startY, isPartner = false, mirrorClass = '') {
-  const cardId = cardIdCounter++;
-  const card = document.createElement('div');
-  card.className = 'effect-card';
+// Word effects key set
+const WORD_EFFECTS = new Set(['love-note', 'never-give-up']);
+
+// Spawns a borderless companion artifact
+function spawnArtifact(effectKey, startX, startY, isPartner = false, mirrorClass = '') {
+  const artifactId = artifactIdCounter++;
+  const artifact = document.createElement('div');
+  artifact.className = 'effect-artifact';
   if (mirrorClass) {
-    card.classList.add(mirrorClass);
+    artifact.classList.add(mirrorClass);
   }
-  
-  // Set card size
-  const cardW = 200;
-  const cardH = 235;
-  
-  // Set position
-  const x = startX !== undefined ? startX : Math.random() * (window.innerWidth - cardW - 40) + 20;
-  const y = startY !== undefined ? startY : Math.random() * (window.innerHeight - cardH - 160) + 85;
-  
-  card.style.left = `${x}px`;
-  card.style.top = `${y}px`;
-  
-  // Header / Title bar
-  const header = document.createElement('div');
-  header.className = 'card-header';
-  
-  const title = document.createElement('span');
-  title.className = 'card-title';
+  if (WORD_EFFECTS.has(effectKey)) {
+    artifact.classList.add('is-word');
+  }
+
+  // Dimension sizing
+  const size = WORD_EFFECTS.has(effectKey) ? 170 : 150;
+  artifact.style.width = `${size}px`;
+  artifact.style.height = WORD_EFFECTS.has(effectKey) ? '100px' : `${size}px`;
+
+  // Random position on playground
+  const x = startX !== undefined ? startX : Math.random() * (window.innerWidth - size - 40) + size / 2 + 20;
+  const y = startY !== undefined ? startY : Math.random() * (window.innerHeight - size - 160) + size / 2 + 85;
+
+  artifact.style.left = `${x - size / 2}px`;
+  artifact.style.top = `${y - (WORD_EFFECTS.has(effectKey) ? 50 : size / 2)}px`;
+
+  // Mount effect inside artifact container
+  const mountFunc = EFFECT_MOUNTS[effectKey];
   const variantIndex = currentVariants[effectKey];
   const variantName = VARIANTS[effectKey][variantIndex];
-  title.textContent = variantName;
-  header.appendChild(title);
   
-  // Close Button
-  if (!isPartner) {
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'card-close';
-    closeBtn.innerHTML = '×';
-    closeBtn.setAttribute('aria-label', 'Close Card');
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeCard(cardId);
-    });
-    header.appendChild(closeBtn);
-  } else {
-    // Spacer for symmetrical cards
-    const spacer = document.createElement('span');
-    spacer.style.width = '16px';
-    header.appendChild(spacer);
-  }
-  
-  card.appendChild(header);
-  
-  // Content stage
-  const content = document.createElement('div');
-  content.className = 'card-content';
-  card.appendChild(content);
-  
-  // Mount effect
-  const mountFunc = EFFECT_MOUNTS[effectKey];
   let effectInstance = null;
   if (mountFunc) {
-    effectInstance = mountFunc(content, { variant: variantName });
+    effectInstance = mountFunc(artifact, { variant: variantName });
   }
-  
-  document.getElementById('playground').appendChild(card);
-  
-  // Trigger entry animation
+
+  document.getElementById('playground').appendChild(artifact);
+
+  // Trigger entry fade-in
   requestAnimationFrame(() => {
-    card.classList.add('mounted');
+    artifact.classList.add('mounted');
   });
 
-  // Dragging and Gestures (Master card only)
-  let dragInstance = null;
+  // Physics, Dragging, Gestures & Trails
+  let transformInstance = null;
   let saveInstance = null;
-  
+
+  const trailColor = EFFECT_TRAIL_COLORS[effectKey] || 'rgba(255, 255, 255, 0.8)';
+
   if (!isPartner) {
-    dragInstance = makeDraggable(
-      card, 
-      header,
-      () => {
-        audioEngine.playInteractionTone();
+    transformInstance = makeFreeTransform(artifact, {
+      onMove: (cx, cy, speed) => {
+        // Spawn trail sparkles
+        const count = Math.min(6, Math.max(1, Math.floor(speed * 0.4)));
+        for (let i = 0; i < count; i++) {
+          trails.spawn(cx + (Math.random() - 0.5) * 15, cy + (Math.random() - 0.5) * 15, trailColor);
+        }
+
+        // Sync positions of symmetrical partners
+        const artifactInfo = activeArtifacts.get(artifactId);
+        if (artifactInfo && artifactInfo.partners) {
+          syncPartners(cx, cy, size, WORD_EFFECTS.has(effectKey) ? 100 : size, artifactInfo.partners);
+        }
       },
-      (nx, ny) => {
-        // Sync position of symmetrical partner cards
-        const cardInfo = activeCards.get(cardId);
-        if (cardInfo && cardInfo.partners) {
-          syncPartners(nx, ny, cardW, cardH, cardInfo.partners);
+      onDoubleTap: () => {
+        closeArtifact(artifactId);
+      },
+      onBounce: () => {
+        // Surge of sparkles on bounce
+        for (let i = 0; i < 20; i++) {
+          const state = transformInstance.getState();
+          trails.spawn(state.x + (Math.random() - 0.5) * 40, state.y + (Math.random() - 0.5) * 40, trailColor);
         }
       }
-    );
+    });
+
+    // Variant cycling on long-press
+    let pressTimer = null;
+    let lpStartX = 0, lpStartY = 0;
     
+    artifact.addEventListener('pointerdown', (e) => {
+      lpStartX = e.clientX;
+      lpStartY = e.clientY;
+      pressTimer = setTimeout(() => {
+        cycleArtifactVariant(artifactId, effectKey, artifact);
+        pressTimer = null;
+      }, 850);
+    });
+
+    artifact.addEventListener('pointermove', (e) => {
+      if (pressTimer && Math.hypot(e.clientX - lpStartX, e.clientY - lpStartY) > 15) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    });
+
+    artifact.addEventListener('pointerup', () => clearTimeout(pressTimer));
+    artifact.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+
     // Save PNG gesture
-    saveInstance = makeSaveGesture(card, () => content.querySelector('canvas'), {
+    saveInstance = makeSaveGesture(artifact, () => artifact.querySelector('canvas'), {
       filename: `gia-${effectKey}-${Date.now()}.png`
     });
   }
 
-  // Store destroy handlers
   const destroyers = [
     () => {
       if (effectInstance && effectInstance.destroy) effectInstance.destroy();
-      if (dragInstance) dragInstance.destroy();
+      if (transformInstance) transformInstance.destroy();
       if (saveInstance) saveInstance.destroy();
-      card.remove();
+      artifact.remove();
     }
   ];
 
-  return { cardId, card, destroyers, w: cardW, h: cardH };
+  return { artifactId, artifact, destroyers, w: size, h: WORD_EFFECTS.has(effectKey) ? 100 : size, transform: transformInstance };
 }
 
 // Sync partners positions based on symmetry
 function syncPartners(masterX, masterY, w, h, partners) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  
+
   partners.forEach((partner) => {
     let px = masterX;
     let py = masterY;
-    
+
     if (partner.mirrorClass === 'mirrored-2') {
-      px = vw - w - masterX;
+      px = vw - masterX;
     } else if (partner.mirrorClass === 'mirrored-4-y') {
-      py = vh - h - masterY;
+      py = vh - masterY;
     } else if (partner.mirrorClass === 'mirrored-4-xy') {
-      px = vw - w - masterX;
-      py = vh - h - masterY;
+      px = vw - masterX;
+      py = vh - masterY;
     }
+
+    // Apply partner transforms
+    partner.card.style.left = `${px - w / 2}px`;
+    partner.card.style.top = `${py - h / 2}px`;
     
-    partner.card.style.left = `${px}px`;
-    partner.card.style.top = `${py}px`;
+    // Spawn trails at partner positions too!
+    const trailColor = EFFECT_TRAIL_COLORS[partner.card.dataset.effect] || 'rgba(255, 255, 255, 0.8)';
+    trails.spawn(px + (Math.random() - 0.5) * 15, py + (Math.random() - 0.5) * 15, trailColor);
   });
 }
 
-// Spawns with current symmetry mode
+// Spawn companions with mirroring symmetry
 function spawnCompanion(effectKey) {
   audioEngine.playInteractionTone();
-  
+
   const mode = symmetry.getMode();
-  const masterInfo = spawnCard(effectKey);
+  const masterInfo = spawnArtifact(effectKey);
   const partners = [];
-  
+
   const w = masterInfo.w;
   const h = masterInfo.h;
-  const masterX = parseFloat(masterInfo.card.style.left);
-  const masterY = parseFloat(masterInfo.card.style.top);
-  
+  const masterX = masterInfo.transform.getState().x;
+  const masterY = masterInfo.transform.getState().y;
+
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  
+
   if (mode === 2) {
-    const px = vw - w - masterX;
-    const partner = spawnCard(effectKey, px, masterY, true, 'mirrored-2');
-    partners.push({ card: partner.card, mirrorClass: 'mirrored-2', destroyers: partner.destroyers });
+    const px = vw - masterX;
+    const partner = spawnArtifact(effectKey, px, masterY, true, 'mirrored-2');
+    partner.artifact.dataset.effect = effectKey;
+    partners.push({ card: partner.artifact, mirrorClass: 'mirrored-2', destroyers: partner.destroyers });
   } else if (mode === 4) {
-    // Horizontal partner
-    const px = vw - w - masterX;
-    const p1 = spawnCard(effectKey, px, masterY, true, 'mirrored-2');
-    partners.push({ card: p1.card, mirrorClass: 'mirrored-2', destroyers: p1.destroyers });
-    
-    // Vertical partner
-    const py = vh - h - masterY;
-    const p2 = spawnCard(effectKey, masterX, py, true, 'mirrored-4-y');
-    partners.push({ card: p2.card, mirrorClass: 'mirrored-4-y', destroyers: p2.destroyers });
-    
-    // Diagonal partner
-    const p3 = spawnCard(effectKey, px, py, true, 'mirrored-4-xy');
-    partners.push({ card: p3.card, mirrorClass: 'mirrored-4-xy', destroyers: p3.destroyers });
-  } else if (mode === 8) {
-    // 8-way mirroring
-    const px = vw - w - masterX;
-    const py = vh - h - masterY;
-    
-    // Symmetrical partners
-    const p1 = spawnCard(effectKey, px, masterY, true, 'mirrored-2');
-    const p2 = spawnCard(effectKey, masterX, py, true, 'mirrored-4-y');
-    const p3 = spawnCard(effectKey, px, py, true, 'mirrored-4-xy');
-    
+    const px = vw - masterX;
+    const py = vh - masterY;
+
+    const p1 = spawnArtifact(effectKey, px, masterY, true, 'mirrored-2');
+    p1.artifact.dataset.effect = effectKey;
+    const p2 = spawnArtifact(effectKey, masterX, py, true, 'mirrored-4-y');
+    p2.artifact.dataset.effect = effectKey;
+    const p3 = spawnArtifact(effectKey, px, py, true, 'mirrored-4-xy');
+    p3.artifact.dataset.effect = effectKey;
+
     partners.push(
-      { card: p1.card, mirrorClass: 'mirrored-2', destroyers: p1.destroyers },
-      { card: p2.card, mirrorClass: 'mirrored-4-y', destroyers: p2.destroyers },
-      { card: p3.card, mirrorClass: 'mirrored-4-xy', destroyers: p3.destroyers }
+      { card: p1.artifact, mirrorClass: 'mirrored-2', destroyers: p1.destroyers },
+      { card: p2.artifact, mirrorClass: 'mirrored-4-y', destroyers: p2.destroyers },
+      { card: p3.artifact, mirrorClass: 'mirrored-4-xy', destroyers: p3.destroyers }
     );
   }
-  
-  activeCards.set(masterInfo.cardId, {
-    card: masterInfo.card,
+
+  activeArtifacts.set(masterInfo.artifactId, {
+    artifact: masterInfo.artifact,
     partners,
     destroyers: masterInfo.destroyers
   });
-  
-  // Show name toast
+
+  // Toast procedural name
   const variantIndex = currentVariants[effectKey];
   const name = generateName(effectKey, variantIndex);
   showToast(name);
 }
 
-// Closes a card and all its symmetrical partners
-function closeCard(cardId) {
-  const cardInfo = activeCards.get(cardId);
-  if (!cardInfo) return;
-  
-  audioEngine.playInteractionTone();
-  
-  // Fade master card
-  cardInfo.card.classList.add('closing');
-  
-  // Fade partners
-  cardInfo.partners.forEach((partner) => {
-    partner.card.classList.add('closing');
-  });
-  
-  // Destroy after animation finishes
-  setTimeout(() => {
-    cardInfo.destroyers.forEach(d => d());
-    cardInfo.partners.forEach((partner) => {
-      partner.destroyers.forEach(d => d());
-    });
-    activeCards.delete(cardId);
-  }, 500);
-}
-
-// Chip tray spawning
-document.querySelectorAll('.chip').forEach((chip) => {
-  const effectKey = chip.getAttribute('data-effect');
-  
-  // Tap to spawn
-  chip.addEventListener('click', () => {
-    spawnCompanion(effectKey);
-  });
-  
-  // Long-press variant cycling detection
-  let pressTimer = null;
-  
-  chip.addEventListener('pointerdown', (e) => {
-    pressTimer = setTimeout(() => {
-      cycleVariant(effectKey, chip);
-      pressTimer = null;
-    }, 850);
-  });
-  
-  chip.addEventListener('pointerup', () => {
-    clearTimeout(pressTimer);
-  });
-  
-  chip.addEventListener('pointercancel', () => {
-    clearTimeout(pressTimer);
-  });
-  
-  // Support desktop right-click to cycle variant instantly
-  chip.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    cycleVariant(effectKey, chip);
-  });
-});
-
-function cycleVariant(effectKey, chip) {
+// Cycles variant for a spawned artifact on long press
+function cycleArtifactVariant(artifactId, effectKey, artifact) {
   const list = VARIANTS[effectKey];
   const nextIndex = (currentVariants[effectKey] + 1) % list.length;
   currentVariants[effectKey] = nextIndex;
-  
+
   const variantName = list[nextIndex];
   audioEngine.playInteractionTone();
-  
+
+  // Recreate effect with new variant
+  recreateEffect(artifact, effectKey, variantName);
+
+  // Sync to partners
+  const info = activeArtifacts.get(artifactId);
+  if (info && info.partners) {
+    info.partners.forEach((partner) => {
+      recreateEffect(partner.card, effectKey, variantName);
+    });
+  }
+
   const name = generateName(effectKey, nextIndex);
-  showToast(`Active: ${name}`);
+  showToast(name);
 }
 
-// Pre-populate playground with 3 initial calming cards
+function recreateEffect(element, effectKey, variantName) {
+  element.innerHTML = '';
+  const mountFunc = EFFECT_MOUNTS[effectKey];
+  if (mountFunc) {
+    mountFunc(element, { variant: variantName });
+  }
+}
+
+// Closes an artifact and its partners
+function closeArtifact(artifactId) {
+  const info = activeArtifacts.get(artifactId);
+  if (!info) return;
+
+  audioEngine.playInteractionTone();
+
+  // Fade out closing elements
+  info.artifact.classList.add('closing');
+  info.partners.forEach(p => p.card.classList.add('closing'));
+
+  setTimeout(() => {
+    info.destroyers.forEach(d => d());
+    info.partners.forEach(p => p.destroyers.forEach(d => d()));
+    activeArtifacts.delete(artifactId);
+  }, 500);
+}
+
+// Setup chip spawning
+document.querySelectorAll('.chip').forEach((chip) => {
+  const effectKey = chip.getAttribute('data-effect');
+
+  chip.addEventListener('click', () => {
+    spawnCompanion(effectKey);
+  });
+
+  // Cycle variants on right-click
+  chip.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const list = VARIANTS[effectKey];
+    const nextIndex = (currentVariants[effectKey] + 1) % list.length;
+    currentVariants[effectKey] = nextIndex;
+    
+    audioEngine.playInteractionTone();
+    const name = generateName(effectKey, nextIndex);
+    showToast(`Active: ${name}`);
+  });
+});
+
+// Pre-populate viewport with 3 borderless items on load
 window.addEventListener('DOMContentLoaded', () => {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  
-  // Center coordinates roughly
-  const cardW = 200;
-  const cardH = 235;
-  
+
   setTimeout(() => {
-    spawnCard('soap-bubble', vw * 0.15, vh * 0.25);
-    spawnCard('petal-drift', vw * 0.55, vh * 0.18);
-    spawnCard('love-note', vw * 0.35, vh * 0.5);
-  }, 500);
+    spawnCompanion('soap-bubble');
+    spawnCompanion('petal-drift');
+    spawnCompanion('love-note');
+  }, 600);
 });
