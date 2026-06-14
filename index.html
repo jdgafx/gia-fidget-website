@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#07050f" />
   <meta name="description" content="A peaceful fidget playground for Gia — soft light, gentle motion, all the colors of hope." />
-  <title>For Gia</title>
+  <title>For Gia — A Fidget Playground</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -33,7 +33,7 @@
 
   <header class="site-header">
     <h1 class="title">For Gia</h1>
-    <p class="prompt" id="prompt">tap a glow · drag · pinch to stretch · double-tap to send away</p>
+    <span class="gia-tag" aria-hidden="true">✦ GIA ✦</span>
   </header>
 
   <main id="effects-stage" class="effects-stage" aria-label="Effects"></main>
@@ -76,7 +76,18 @@
         </span>
         <span class="chip-label">Ripple</span>
       </button>
-      <span class="chip-divider" aria-hidden="true"></span>
+      <button class="chip" data-effect="sand-pour" type="button" aria-label="Sand Pour">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 4c-2 4-2 8 0 12 2-4 2-8 0-12zM6 10c2 2 4 2 6 0M12 10c2 2 4 2 6 0M9 16c1 2 2 2 3 0M12 16c1 2 2 2 3 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        <span class="chip-label">Sand</span>
+      </button>
+      <button class="chip" data-effect="chill-3d" type="button" aria-label="3D Dreamscape">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        </span>
+        <span class="chip-label">3D</span>
+      </button>
       <button class="chip chip-word" data-effect="love-note" type="button" aria-label="I Love You, Dad">
         <span class="chip-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.7A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" fill="currentColor" opacity=".75"/></svg>
@@ -89,8 +100,36 @@
         </span>
         <span class="chip-label">Hope</span>
       </button>
+      <span class="chip-divider" aria-hidden="true"></span>
+      <button class="chip chip-toggle" data-effect="symmetry-toggle" type="button" aria-label="Toggle Symmetry">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="2"/><path d="M8 8l-4 4 4 4M16 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="chip-label">Mirror</span>
+      </button>
+      <button class="chip chip-toggle" data-effect="audio-mute" type="button" aria-label="Toggle Audio">
+        <span class="chip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 10v4h4l5 4V6L8 10H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 8c1.5 1.5 1.5 6.5 0 8M19 5c3 3 3 11 0 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </span>
+        <span class="chip-label">Audio</span>
+      </button>
     </div>
   </nav>
+
+  <!-- Persistent control hints — always visible bottom strip.
+        Mobile: drag · pinch · rotate · double-tap
+        Desktop: drag · pinch · rotate · tilt · scroll · double-tap -->
+  <aside class="controls-hint" id="controls-hint" aria-label="Controls">
+    <span class="hint-item">drag</span>
+    <span class="hint-item">·</span>
+    <span class="hint-item">pinch + rotate</span>
+    <span class="hint-item">·</span>
+    <span class="hint-item hint-wheel">3D tilt</span>
+    <span class="hint-item hint-wheel">·</span>
+    <span class="hint-item hint-wheel">scroll</span>
+    <span class="hint-item">·</span>
+    <span class="hint-item">double-tap ✕</span>
+  </aside>
 
   <script type="module" src="main.js"></script>
 </body>

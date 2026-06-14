@@ -180,7 +180,7 @@ export function mountBackground(canvas) {
   scene.add(quad);
 
   const reduced = prefersReducedMotion();
-  const speed = reduced ? 1 / 2 : 1;
+  let speed = reduced ? 1 / 2 : 1;
 
   let pointerTargetX = 0, pointerTargetY = 0;
   let pointerEased = 0;
@@ -239,6 +239,14 @@ export function mountBackground(canvas) {
       quad.geometry.dispose();
       mat.dispose();
       renderer.dispose();
+      speed = 1.0;
+      renderer.domElement.style.opacity = '1';
+    },
+    setSpeed(multiplier) {
+      speed = multiplier;
+    },
+    setOpacity(multiplier) {
+      renderer.domElement.style.opacity = String(multiplier);
     },
   };
 }
