@@ -123,7 +123,7 @@ function createOrbitControls(camera, domEl) {
   };
 }
 
-export function mount(container, opts = {}) {
+export function mountChill3D(container, opts = {}) {
   const dpr = getDpr();
   const reduced = prefersReducedMotion();
   const quality = document.body.dataset.quality || 'full';

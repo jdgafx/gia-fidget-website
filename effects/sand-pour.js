@@ -188,7 +188,7 @@ function getGridSize(quality) {
   }
 }
 
-export function mount(container, opts = {}) {
+export function mountSandPour(container, opts = {}) {
   const dpr = getDpr();
   const reduced = prefersReducedMotion();
 
