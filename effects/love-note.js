@@ -1,96 +1,123 @@
-// effects/love-note.js — "I Love You, Dad :) :)"
-// Soft pastel card with letter-stagger fade-in, breathing smileys,
-// gentle vertical float, and tap-to-glow. Pure CSS animations + tiny
-// JS for the tap pulse. No WebGL needed.
-
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
+// effects/love-note.js — Soothing, heart-burst text companion
 
 export function mountLoveNote(container, opts = {}) {
-  const reduced = prefersReducedMotion();
-  const speed = reduced ? 0.5 : 1.0;
-
-  const variant = opts.variant || 'Classic';
-  let phrase = "I Love You, Dad";
-  let smileys = [":)", ":)"];
-  if (variant === 'Playful') {
-    phrase = "You Are Awesome, Dad!";
-    smileys = ["★", "★"];
-  } else if (variant === 'Tender') {
-    phrase = "You Make Me Smile";
-    smileys = ["♥", "♥"];
-  }
-
-  const words = phrase.split(' ');
-  const phraseHtml = words.map((w, idx) => `<span class="love-word" style="--i:${idx}">${w}</span>`).join(' ');
-  const smileysHtml = smileys.map((s, idx) => `<span class="love-smiley" style="--i:${idx}">${s}</span>`).join(' ');
-
-  container.innerHTML = `
-    <div class="love-note" role="figure" aria-label="${phrase}">
-      <div class="love-note-phrase">
-        ${phraseHtml}
-      </div>
-      <div class="love-smileys" aria-hidden="true">
-        ${smileysHtml}
-      </div>
-      <div class="love-shimmer" aria-hidden="true"></div>
-    </div>
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, hsla(354, 84%, 93%, 0.15), transparent 75%);
+    pointer-events: auto;
   `;
+  container.appendChild(wrap);
 
-  // Apply speed.
-  const root = container.querySelector('.love-note');
-  root.style.setProperty('--speed', String(speed));
+  const text = document.createElement('div');
+  text.style.cssText = `
+    font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 26px;
+    color: hsl(354, 84%, 75%);
+    text-shadow: 0 0 10px hsla(354, 84%, 75%, 0.3);
+    user-select: none;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.2;
+  `;
+  text.innerHTML = 'love & light<br><span style="font-size: 16px; opacity: 0.85;">for Gia</span>';
+  wrap.appendChild(text);
 
-  // Visibility: pause the parallax loop when offscreen.
-  const vis = createVisibilityObserver(container);
-  let raf = 0;
+  // Canvas overlay for tapping/bursting hearts
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+  wrap.appendChild(canvas);
 
-  // Pointer parallax: phrase drifts toward the cursor.
-  const target = { x: 0, y: 0 };
-  const cur = { x: 0, y: 0 };
-  function onPointerMove(e) {
-    const r = container.getBoundingClientRect();
-    target.x = ((e.clientX - r.left) / r.width - 0.5) * 2;   // -1..1
-    target.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
+
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+
+  const particles = [];
+
+  function drawHeart(ctx, x, y, size, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y + size / 4);
+    ctx.bezierCurveTo(x, y - size / 2, x - size, y - size / 2, x - size, y + size / 10);
+    ctx.bezierCurveTo(x - size, y + size * 0.6, x, y + size, x, y + size);
+    ctx.bezierCurveTo(x, y + size, x + size, y + size * 0.6, x + size, y + size / 10);
+    ctx.bezierCurveTo(x + size, y - size / 2, x, y - size / 2, x, y + size / 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
-  function onPointerLeave() { target.x = 0; target.y = 0; }
-  container.addEventListener('pointermove', onPointerMove, { passive: true });
-  container.addEventListener('pointerleave', onPointerLeave, { passive: true });
 
-  function tick() {
-    if (!shouldRender(container, vis)) {
-      raf = requestAnimationFrame(tick);
-      return;
+  function spawnHearts(tx, ty) {
+    for (let i = 0; i < 12; i++) {
+      particles.push({
+        x: tx,
+        y: ty,
+        vx: (Math.random() - 0.5) * 3,
+        vy: (Math.random() - 0.6) * 3 - 1, // slight upward bias
+        size: 4 + Math.random() * 6,
+        color: `hsla(354, ${75 + Math.random() * 20}%, 75%, 0.85)`,
+        opacity: 1.0,
+        decay: 0.015 + Math.random() * 0.01
+      });
     }
-    // Smooth follow.
-    cur.x += (target.x - cur.x) * 0.12;
-    cur.y += (target.y - cur.y) * 0.12;
-    // Active rotation phase for the spin animation.
-    const t = performance.now() / 1000;
-    const ma = Math.sin(t * 1.2) * 0.6 + Math.sin(t * 0.7) * 0.4;
-    root.style.setProperty('--mx', cur.x.toFixed(3));
-    root.style.setProperty('--my', cur.y.toFixed(3));
-    root.style.setProperty('--ma', ma.toFixed(3));
-    raf = requestAnimationFrame(tick);
-  }
-  raf = requestAnimationFrame(tick);
 
-  // Tap to pulse the smileys.
-  function onPointerDown() {
-    root.classList.remove('love-tap');
-    void root.offsetWidth; // restart animation
-    root.classList.add('love-tap');
+    if (window.audioEngineInstance) {
+      window.audioEngineInstance.playInteractionTone();
+    }
   }
-  container.addEventListener('pointerdown', onPointerDown, { passive: true });
+
+  wrap.addEventListener('pointerdown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    const y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    spawnHearts(x, y);
+  });
+
+  function draw() {
+    if (!active) return;
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05; // soft gravity
+      p.opacity -= p.decay;
+
+      if (p.opacity <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = p.opacity;
+      drawHeart(ctx, p.x, p.y, p.size, p.color);
+      ctx.restore();
+    }
+
+    animationFrameId = requestAnimationFrame(draw);
+  }
+
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      vis.destroy();
-      container.removeEventListener('pointermove', onPointerMove);
-      container.removeEventListener('pointerleave', onPointerLeave);
-      container.removeEventListener('pointerdown', onPointerDown);
-      container.innerHTML = '';
-    },
+      active = false;
+      cancelAnimationFrame(animationFrameId);
+      wrap.remove();
+    }
   };
 }

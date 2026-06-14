@@ -1,232 +1,102 @@
-// effects/fluid-goo.js — MiMo-inspired metaball blob.
-// Soft pastel base; rainbow emerges only when pointer is near.
-// Breath-rhythm scale, pointer-follow with damping, tap = soft bloom.
+// effects/fluid-goo.js — Hardware-accelerated fluid metaball goo
 
-import * as THREE from 'three';
-import { getDpr } from '../lib/dpr.js';
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
-import { breathScale, pointerDamp } from '../lib/easing.js';
-import { rainbowAccent } from '../lib/palette.js';
-
-const VERT = /* glsl */`
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-// Soft-min metaball shader with a fluid noise displacement and a
-// rainbow gradient that fades in as the pointer approaches.
-const FRAG = /* glsl */`
-  precision highp float;
-  varying vec2 vUv;
-  uniform float uTime;
-  uniform vec2  uPointerLocal;  // -1..1 inside quad
-  uniform float uPointerProx;   // 0..1
-  uniform float uBloom;         // 0..1, tap-driven
-  uniform float uBreath;        // 0..1, sinusoidal
-
-  float hash(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-  }
-  float noise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = hash(i), b = hash(i + vec2(1, 0));
-    float c = hash(i + vec2(0, 1)), d = hash(i + vec2(1, 1));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-  }
-  float fbm(vec2 p) {
-    float v = 0.0, a = 0.5;
-    for (int i = 0; i < 4; i++) {
-      v += a * noise(p);
-      p *= 2.05;
-      a *= 0.5;
-    }
-    return v;
-  }
-
-  vec3 hsl2rgb(vec3 c) {
-    vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
-    return c.z + c.y * (p - 1.5) * (1.0 - abs(2.0 * c.z - 1.0));
-  }
-
-  void main() {
-    vec2 uv = vUv * 2.0 - 1.0;
-
-    // Spin the whole cluster around its center, pinwheel-style.
-    float spin = uTime * 0.55;
-    vec2 ruv = vec2(
-      uv.x * cos(spin) - uv.y * sin(spin),
-      uv.x * sin(spin) + uv.y * cos(spin)
-    );
-
-    // Fluid displacement — soft, organic.
-    float n = fbm(ruv * 1.4 + vec2(uTime * 0.18, -uTime * 0.12));
-    float r = length(ruv) + (n - 0.5) * 0.30;
-
-    // Soft-min field — multiple blobs to give the goo look. Spinning.
-    float blobs = 0.0;
-    for (int i = 0; i < 6; i++) {
-      float a = float(i) * 1.0472 + uTime * 0.55;  // 60° steps, fast spin
-      vec2 pOff = uPointerLocal * 0.35;
-      float radius = 0.30 + 0.14 * sin(uTime * 1.2 + a);
-      vec2 c = vec2(cos(a), sin(a)) * 0.38 + pOff;
-      float d = length(uv - c) - radius;
-      blobs += 0.20 / (d * d * 28.0 + 0.1);
-    }
-
-    float mask = smoothstep(0.55, 1.05, blobs + 0.6);
-
-    // Pointer proximity brightens a hue band.
-    float px = length(uv - uPointerLocal);
-    // Bigger, longer reach — the whole blob reacts to nearby cursor.
-    float prox = smoothstep(1.4, 0.0, px) * uPointerProx;
-
-    // Vivid rainbow swirl — always alive, brighter on pointer proximity.
-    // Spans the full hue wheel so the blob is always colorful.
-    float ang = atan(uv.y, uv.x);
-    float hue = fract(0.5 + ang / 6.28318 + uTime * 0.10);
-
-    // Bright saturated base (was pastel peach/lavender — too washed out on dark).
-    vec3 base = mix(
-      vec3(0.95, 0.30, 0.55),   // hot pink
-      vec3(0.55, 0.30, 0.95),   // electric violet
-      0.5 + 0.5 * sin(uTime * 0.3)
-    );
-
-    vec3 rainbow = hsl2rgb(vec3(hue, 0.90, 0.65));
-
-    vec3 col = mix(base, rainbow, 0.45 + prox * 0.55);
-
-    // Tap bloom — a bright inner glow that decays.
-    col += rainbow * uBloom * 0.6;
-    col += vec3(1.0) * uBloom * 0.3;
-
-    // Subtle breath tint.
-    col *= 0.95 + 0.08 * uBreath;
-
-    // Soft outer glow halo — gives the blob presence on dark.
-    float halo = smoothstep(1.1, 0.3, length(uv));
-    col += rainbow * halo * 0.10;
-
-    // Edge softness — fade out around the quad.
-    float edge = smoothstep(1.2, 0.5, length(uv));
-    col *= edge;
-
-    // Bright highlight where pointer is closest.
-    col += rainbow * prox * 0.25 * (1.0 - smoothstep(0.0, 0.6, px));
-
-    gl_FragColor = vec4(col, mask);
-  }
-`;
-
-export function mountFluidGoo(container) {
+export function mountFluidGoo(container, opts = {}) {
   const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
   container.appendChild(canvas);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(getDpr());
-  renderer.setClearColor(0x000000, 0);
+  // Apply CSS metaball filter to container
+  container.style.filter = 'blur(10px) contrast(15)';
+  container.style.backgroundColor = 'transparent';
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.z = 2.4;
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
 
-  const uniforms = {
-    uTime:         { value: 0 },
-    uPointerLocal: { value: new THREE.Vector2(0, 0) },
-    uPointerProx:  { value: 0 },
-    uBloom:        { value: 0 },
-    uBreath:       { value: 0 },
-  };
+  // Tiny internal canvas size to make drawing fast
+  const WIDTH = 150;
+  const HEIGHT = 150;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
 
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    uniforms,
-    transparent: true,
-    depthWrite: false,
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
-  scene.add(mesh);
+  // Blob states: x, y, radius, speed, angle, color
+  const blobs = [
+    { x: 75, y: 75, r: 24, speed: 0.8, angle: 0, color: 'hsl(16, 100%, 75%)' },
+    { x: 50, y: 60, r: 18, speed: 0.6, angle: Math.PI / 3, color: 'hsl(265, 75%, 80%)' },
+    { x: 90, y: 80, r: 20, speed: 0.7, angle: Math.PI * 1.2, color: 'hsl(208, 90%, 80%)' },
+    { x: 65, y: 90, r: 16, speed: 0.5, angle: Math.PI * 0.7, color: 'hsl(144, 70%, 78%)' }
+  ];
 
-  const reduced = prefersReducedMotion();
-  const vis = createVisibilityObserver(canvas);
-
-  // Pointer state inside the canvas.
-  const target = { x: 0, y: 0, prox: 0 };
-  let bloom = 0;
+  // Mouse reaction
+  let mouse = { x: 75, y: 75, active: false };
 
   function onPointerMove(e) {
-    const r = canvas.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 2 - 1;
-    const y = -(((e.clientY - r.top) / r.height) * 2 - 1);
-    target.x = x; target.y = y; target.prox = 1;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    mouse.y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    mouse.active = true;
   }
-  function onPointerLeave() { target.prox = 0; }
-  function onPointerDown() { bloom = 1; }
+
+  function onPointerLeave() {
+    mouse.active = false;
+  }
 
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });
   canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
-  canvas.addEventListener('pointerdown', onPointerDown, { passive: true });
 
-  function resize() {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (w === 0 || h === 0) return;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+  let time = 0;
+
+  function draw() {
+    if (!active) return;
+
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    time += 0.015;
+
+    // Background color matching void/dark
+    ctx.fillStyle = 'rgba(15, 10, 30, 0.9)';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    blobs.forEach((b, i) => {
+      // Slow circular drift (breath rhythm cycle ~8s)
+      const driftX = Math.cos(time + i * 2) * 15;
+      const driftY = Math.sin(time + i * 2) * 15;
+
+      let tx = b.x + driftX;
+      let ty = b.y + driftY;
+
+      // Soft pull to mouse if hover is active
+      if (mouse.active) {
+        tx += (mouse.x - tx) * 0.15;
+        ty += (mouse.y - ty) * 0.15;
+      }
+
+      // Draw soft gradient circle
+      const grad = ctx.createRadialGradient(tx, ty, 0, tx, ty, b.r);
+      grad.addColorStop(0, b.color);
+      grad.addColorStop(0.8, b.color);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(tx, ty, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    animationFrameId = requestAnimationFrame(draw);
   }
-  resize();
-  const ro = new ResizeObserver(resize);
-  ro.observe(container);
 
-  const clock = new THREE.Clock();
-  let raf = 0;
-  function frame() {
-    if (!shouldRender(canvas, vis)) {
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
-
-    // Faster pointer damping so the blob really chases the cursor.
-    const damp = pointerDamp(dt, 0.18);
-    const cur = uniforms.uPointerLocal.value;
-    cur.x += (target.x - cur.x) * damp;
-    cur.y += (target.y - cur.y) * damp;
-    uniforms.uPointerProx.value += (target.prox - uniforms.uPointerProx.value) * damp;
-
-    bloom *= Math.exp(-dt / 0.4);
-    uniforms.uBloom.value = bloom;
-
-    uniforms.uTime.value = t;
-    uniforms.uBreath.value = 0.5 + 0.5 * Math.sin(t * 0.9);
-
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(frame);
-  }
-  raf = requestAnimationFrame(frame);
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      vis.destroy();
+      active = false;
+      cancelAnimationFrame(animationFrameId);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerleave', onPointerLeave);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      mesh.geometry.dispose();
-      mat.dispose();
-      renderer.dispose();
       canvas.remove();
-    },
+      container.style.filter = '';
+    }
   };
 }

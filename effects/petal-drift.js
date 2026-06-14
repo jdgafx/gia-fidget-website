@@ -1,188 +1,128 @@
-// effects/petal-drift.js — Custom canvas petals.
-// Slow-falling vivid petals with gentle horizontal sway, soft pointer
-// repulsion, breath-rhythm. Pure canvas2d (no library).
+// effects/petal-drift.js — Soft slow-falling pastel petals
 
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
-
-const COLORS = [
-  [255, 107, 157], // rose
-  [167, 139, 250], // violet
-  [ 96, 165, 250], // blue
-  [ 52, 211, 197], // teal
-  [163, 230,  53], // lime
-  [251, 191,  36], // gold
-  [232, 121, 249], // magenta
-];
-
-class Petal {
-  constructor(w, h) {
-    this.reset(w, h, true);
-  }
-  reset(w, h, init = false) {
-    this.x = Math.random() * w;
-    this.y = init ? Math.random() * h : -10 - Math.random() * 40;
-    this.size = 4 + Math.random() * 10;
-    // Faster fall so it feels alive.
-    this.vy = 0.5 + Math.random() * 1.1;
-    this.vx = (Math.random() - 0.5) * 0.5;
-    this.rot = Math.random() * Math.PI * 2;
-    this.vrot = (Math.random() - 0.5) * 0.07;
-    this.swayPhase = Math.random() * Math.PI * 2;
-    this.swaySpeed = 0.6 + Math.random() * 0.8;
-    this.swayAmp = 0.7 + Math.random() * 1.1;
-    this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
-    this.alpha = 0.6 + Math.random() * 0.35;
-  }
-  update(dt, t, w, h) {
-    // Swirl vortex — petals rotate around the center as they fall.
-    const cx = w / 2;
-    const cy = h / 2;
-    const dx = this.x - cx;
-    const dy = this.y - cy;
-    const r = Math.sqrt(dx * dx + dy * dy) || 1;
-    // Tangential force creates pinwheel spin.
-    const tangX = -dy / r;
-    const tangY = dx / r;
-    // Sway
-    const sway = Math.sin(t * this.swaySpeed + this.swayPhase) * this.swayAmp;
-    // Center pull gets weaker with radius (vortex profile).
-    const spinStrength = 0.018 * (1 - Math.min(1, r / Math.max(w, h)));
-    this.x += (tangX * spinStrength + this.vx + sway * 0.4) * dt * 60;
-    this.y += (tangY * spinStrength + this.vy) * dt * 60;
-    this.rot += this.vrot * dt * 60;
-    if (this.y > h + 20 || this.x < -20 || this.x > w + 20) this.reset(w, h);
-  }
-  draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rot);
-    ctx.globalAlpha = this.alpha;
-    // Petal shape: an ellipse with a soft inner highlight
-    const r = this.size;
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-    grad.addColorStop(0,   `rgba(${this.color[0]},${this.color[1]},${this.color[2]},1)`);
-    grad.addColorStop(0.6, `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0.6)`);
-    grad.addColorStop(1,   `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0)`);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r, r * 0.55, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Glow
-    ctx.globalAlpha = this.alpha * 0.5;
-    ctx.shadowColor = `rgba(${this.color[0]},${this.color[1]},${this.color[2]},0.8)`;
-    ctx.shadowBlur = r * 0.8;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.5, r * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-export function mountPetalDrift(container) {
+export function mountPetalDrift(container, opts = {}) {
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
   container.appendChild(canvas);
 
   const ctx = canvas.getContext('2d');
-  const reduced = prefersReducedMotion();
-  const COUNT = reduced ? 50 : 160;
+  let animationFrameId = null;
+  let active = true;
 
-  const petals = [];
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  const vis = createVisibilityObserver(canvas);
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
 
-  // Pointer repulsion state.
-  const ptr = { x: 0, y: 0, inside: false };
-  let lastPtrX = 0, lastPtrY = 0, lastPtrSpeed = 0;
+  const PETAL_COUNT = 15;
+  const colors = [
+    'rgba(255, 107, 157, 0.75)', // pink
+    'rgba(167, 139, 250, 0.75)', // violet
+    'rgba(255, 229, 217, 0.75)', // peach
+    'rgba(220, 238, 251, 0.75)'  // sky
+  ];
+
+  const petals = Array.from({ length: PETAL_COUNT }, () => createPetal(true));
+
+  function createPetal(randomY = false) {
+    return {
+      x: Math.random() * WIDTH,
+      y: randomY ? Math.random() * HEIGHT : -10,
+      r: 3 + Math.random() * 4,
+      speedY: 0.2 + Math.random() * 0.4,
+      swaySpeed: 0.02 + Math.random() * 0.03,
+      swayAmp: 1.5 + Math.random() * 3,
+      phase: Math.random() * 10,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rot: Math.random() * Math.PI,
+      rotSpeed: (Math.random() - 0.5) * 0.02
+    };
+  }
+
+  let mouse = { x: 0, y: 0, hover: false };
 
   function onPointerMove(e) {
-    const r = canvas.getBoundingClientRect();
-    const newX = e.clientX - r.left;
-    const newY = e.clientY - r.top;
-    const speed = Math.hypot(newX - ptr.x, newY - ptr.y);
-    if (speed > 30 && lastPtrSpeed < 10) {
-      import('../lib/party-explosion.js').then(m => {
-        m.createExplosion(container, newX, newY, 'confetti');
-      });
-    }
-    lastPtrSpeed = speed;
-    ptr.x = newX;
-    ptr.y = newY;
-    ptr.inside = true;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    mouse.y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    mouse.hover = true;
   }
-  function onPointerLeave() { ptr.inside = false; }
+
+  function onPointerLeave() {
+    mouse.hover = false;
+  }
+
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });
   canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
 
-  function resize() {
-    const r = container.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) return;
-    canvas.width = Math.round(r.width * dpr);
-    canvas.height = Math.round(r.height * dpr);
-    canvas.style.width = `${r.width}px`;
-    canvas.style.height = `${r.height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Re-seed petals to fit the new size.
-    if (petals.length === 0) {
-      for (let i = 0; i < COUNT; i++) petals.push(new Petal(r.width, r.height));
-    }
-  }
-  resize();
-  const ro = new ResizeObserver(resize);
-  ro.observe(container);
+  let time = 0;
 
-  let last = performance.now();
-  let t = 0;
-  let raf = 0;
-  function frame(now) {
-    if (!shouldRender(canvas, vis)) {
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-    const dt = Math.min((now - last) / 1000, 0.05);
-    last = now;
-    t += dt;
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
+  function draw() {
+    if (!active) return;
+    time += 1;
 
-    // Soft repulsion from pointer (if inside) — bigger, stronger.
-    let repel = null;
-    if (ptr.inside) {
-      const radius = 140;
-      repel = { x: ptr.x, y: ptr.y, r: radius, r2: radius * radius };
-    }
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    ctx.clearRect(0, 0, w, h);
+    petals.forEach((p) => {
+      // Falling speed
+      p.y += p.speedY;
 
-    for (const p of petals) {
-      if (repel) {
-        const dx = p.x - repel.x;
-        const dy = p.y - repel.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < repel.r2) {
-          const d = Math.sqrt(d2) || 1;
-          const f = (1 - d / repel.r) * 0.7;
-          p.x += (dx / d) * f;
-          p.y += (dy / d) * f;
+      // Horizontal sway (breath rhythm)
+      const sway = Math.sin(time * p.swaySpeed + p.phase) * (p.swayAmp * 0.1);
+      p.x += sway;
+      p.rot += p.rotSpeed;
+
+      // Soft pointer repulsion
+      if (mouse.hover) {
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 40) {
+          const force = (40 - dist) / 40;
+          p.x += (dx / dist) * force * 1.5;
+          p.y += (dy / dist) * force * 1.5;
         }
       }
-      p.update(dt, t, w, h);
-      p.draw(ctx);
-    }
 
-    raf = requestAnimationFrame(frame);
+      // Wrap-around / recycle petals
+      if (p.y > HEIGHT + 10 || p.x < -10 || p.x > WIDTH + 10) {
+        Object.assign(p, createPetal(false));
+      }
+
+      // Draw petal (leaf/ellipse shape)
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+
+      ctx.beginPath();
+      // Draw smooth almond shape petal
+      ctx.ellipse(0, 0, p.r, p.r * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Soft white reflection spot on petal for glossiness
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.beginPath();
+      ctx.ellipse(-p.r * 0.3, -p.r * 0.1, p.r * 0.25, p.r * 0.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+    animationFrameId = requestAnimationFrame(draw);
   }
-  raf = requestAnimationFrame(frame);
+
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      vis.destroy();
+      active = false;
+      cancelAnimationFrame(animationFrameId);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.remove();
-    },
+    }
   };
 }

@@ -1,71 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-  <meta name="theme-color" content="#07050f" />
-  <meta name="description" content="A playful fidget playground for Gia — grab, fling, spin, and explode everything." />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f0a1e">
+  <meta name="description" content="A peaceful fidget playground for Gia — soft light, gentle motion, all the colors of hope.">
   <title>For Gia — Fidget Playground</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Inter:wght@300;400;500&display=swap"
-  />
+  <!-- Google Fonts: Inter and Cormorant Garamond -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=1.0.2" />
-
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "./lib/free-transform.js": "./lib/free-transform.js?v=1.0.2",
-        "./lib/radial-menu.js": "./lib/radial-menu.js?v=1.0.2",
-        "./lib/orb-cursor.js": "./lib/orb-cursor.js?v=1.0.2"
-      }
-    }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <canvas id="ambient-canvas" aria-hidden="true"></canvas>
-  <div class="vignette" aria-hidden="true"></div>
+  <!-- Ambient background canvas -->
+  <canvas id="ambient-canvas"></canvas>
 
   <header class="site-header">
     <h1 class="title">For Gia</h1>
-    <span class="gia-tag" aria-hidden="true">✦ GIA ✦</span>
+    <p class="tagline">✦ GIA ✦</p>
   </header>
 
-  <div class="site-controls" id="site-controls" aria-label="Controls">
-    <button class="control-btn" id="audio-toggle" type="button" aria-label="Toggle Audio">
-      <svg class="icon-audio-on" viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3v18l-6-6H2V9h4l6-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><path d="M15.5 8.5a4 4 0 0 1 0 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 5.5a9 9 0 0 1 0 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <svg class="icon-audio-off hidden" viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3v18l-6-6H2V9h4l6-6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><line x1="22" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="16" y1="9" x2="22" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  <!-- Control Buttons (Mute and Symmetry) -->
+  <div class="control-panel">
+    <button id="mute-btn" class="icon-btn" aria-label="Mute Audio">
+      <svg class="sound-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+      <svg class="sound-off hidden" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
     </button>
-    <button class="control-btn" id="symmetry-toggle" type="button" aria-label="Toggle Mirror Mode">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 8l-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      <span class="control-badge" id="symmetry-badge">Off</span>
+    <button id="symmetry-btn" class="icon-btn" aria-label="Toggle Mirror Mode">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="22"></line></svg>
+      <span id="symmetry-badge">Off</span>
     </button>
   </div>
 
-  <main id="effects-stage" class="effects-stage" aria-label="Effects">
-    <div class="empty-state" id="empty-state">
-      <div class="empty-state-orb"></div>
-      <p class="empty-state-text">Long-press anywhere to begin</p>
+  <!-- The Fidget Stage -->
+  <main id="playground"></main>
+
+  <!-- Bottom Chip Tray -->
+  <nav class="chip-tray-container" aria-label="Companion Spawn Tray">
+    <div class="chip-tray">
+      <button class="chip glow-goo" data-effect="fluid-goo" aria-label="Spawn Fluid Goo">
+        <span class="chip-icon">💧</span>
+        <span class="chip-label">Goo</span>
+      </button>
+      <button class="chip glow-bubble" data-effect="soap-bubble" aria-label="Spawn Soap Bubble">
+        <span class="chip-icon">🫧</span>
+        <span class="chip-label">Bubble</span>
+      </button>
+      <button class="chip glow-petals" data-effect="petal-drift" aria-label="Spawn Petal Drift">
+        <span class="chip-icon">🌸</span>
+        <span class="chip-label">Petals</span>
+      </button>
+      <button class="chip glow-aurora" data-effect="aurora-ribbon" aria-label="Spawn Aurora Ribbon">
+        <span class="chip-icon">🌈</span>
+        <span class="chip-label">Aurora</span>
+      </button>
+      <button class="chip glow-galaxy" data-effect="galaxy" aria-label="Spawn Galaxy">
+        <span class="chip-icon">🌌</span>
+        <span class="chip-label">Galaxy</span>
+      </button>
+      <button class="chip glow-ripple" data-effect="glow-ripple" aria-label="Spawn Glow Ripple">
+        <span class="chip-icon">💫</span>
+        <span class="chip-label">Ripple</span>
+      </button>
+      <button class="chip glow-sand" data-effect="sand-pour" aria-label="Spawn Sand Pour">
+        <span class="chip-icon">⏳</span>
+        <span class="chip-label">Sand</span>
+      </button>
+      <button class="chip glow-3d" data-effect="chill-3d" aria-label="Spawn Dreamscape">
+        <span class="chip-icon">🔮</span>
+        <span class="chip-label">3D</span>
+      </button>
+      <button class="chip glow-love" data-effect="love-note" aria-label="Spawn Love Note">
+        <span class="chip-icon">❤️</span>
+        <span class="chip-label">Love</span>
+      </button>
+      <button class="chip glow-hope" data-effect="never-give-up" aria-label="Spawn Hope Card">
+        <span class="chip-icon">⭐</span>
+        <span class="chip-label">Hope</span>
+      </button>
     </div>
-  </main>
+  </nav>
 
-  <aside class="controls-hint" id="controls-hint" aria-label="How to interact">
-    <span class="hint-item">Grab</span>
-    <span class="hint-item">·</span>
-    <span class="hint-item">Fling</span>
-    <span class="hint-item">·</span>
-    <span class="hint-item">Spin</span>
-    <span class="hint-item">·</span>
-    <span class="hint-item">Double-tap to explode</span>
-  </aside>
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
 
-  <script type="module" src="main.js?v=1.0.2"></script>
+  <!-- App Bootstrap -->
+  <script type="module" src="main.js"></script>
 </body>
 </html>

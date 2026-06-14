@@ -1,101 +1,136 @@
-// effects/never-give-up.js — "Never Give Up"
-// A mantra card. Letters fade in with a stagger, a rainbow gradient
-// flows through the text continuously, and a thin rainbow underline
-// "draws" from left to right. Tap to refresh the underline.
-
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
+// effects/never-give-up.js — Soothing, star-burst hope text companion
 
 export function mountNeverGiveUp(container, opts = {}) {
-  const reduced = prefersReducedMotion();
-  const speed = reduced ? 0.4 : 1.0;
-
-  const variant = opts.variant || 'Classic';
-  let lines = [["Never"], ["Give", "Up"]];
-  if (variant === 'Bold') {
-    lines = [["Dream"], ["Big", "Dreams"]];
-  } else if (variant === 'Gentle') {
-    lines = [["Breathe", "In,"], ["Breathe", "Out"]];
-  }
-
-  const spans = (words) => {
-    let index = 0;
-    return words.map(word => {
-      return word.split('').map(ch => {
-        const span = `<span class="ng-letter" style="--i:${index}">${ch}</span>`;
-        index++;
-        return span;
-      }).join('') + '<span class="ng-space">&nbsp;</span>';
-    }).join('');
-  };
-
-  const line1Html = spans(lines[0]);
-  const line2Html = spans(lines[1]);
-  const fullText = lines.flat().join(' ');
-
-  container.innerHTML = `
-    <div class="ng" role="figure" aria-label="${fullText}">
-      <div class="ng-line ng-line-1">${line1Html}</div>
-      <div class="ng-line ng-line-2">${line2Html}</div>
-      <div class="ng-underline" aria-hidden="true">
-        <div class="ng-underline-fill"></div>
-      </div>
-      <div class="ng-glow" aria-hidden="true"></div>
-    </div>
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, hsla(48, 100%, 89%, 0.15), transparent 75%);
+    pointer-events: auto;
   `;
+  container.appendChild(wrap);
 
-  const root = container.querySelector('.ng');
-  root.style.setProperty('--speed', String(speed));
+  const text = document.createElement('div');
+  text.style.cssText = `
+    font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 26px;
+    color: hsl(42, 85%, 68%);
+    text-shadow: 0 0 10px hsla(42, 85%, 68%, 0.3);
+    user-select: none;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.2;
+  `;
+  text.innerHTML = 'never give up<br><span style="font-size: 16px; opacity: 0.85;">dear Gia</span>';
+  wrap.appendChild(text);
 
-  const vis = createVisibilityObserver(container);
-  let raf = 0;
+  // Canvas overlay for tapping/bursting stars
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+  wrap.appendChild(canvas);
 
-  // Pointer parallax.
-  const target = { x: 0, y: 0 };
-  const cur = { x: 0, y: 0 };
-  function onPointerMove(e) {
-    const r = container.getBoundingClientRect();
-    target.x = ((e.clientX - r.left) / r.width - 0.5) * 2;
-    target.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
-  }
-  function onPointerLeave() { target.x = 0; target.y = 0; }
-  container.addEventListener('pointermove', onPointerMove, { passive: true });
-  container.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
 
-  function tick() {
-    if (!shouldRender(container, vis)) {
-      raf = requestAnimationFrame(tick);
-      return;
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+
+  const particles = [];
+
+  function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius, color) {
+    let rot = Math.PI / 2 * 3;
+    let x = cx;
+    let y = cy;
+    let step = Math.PI / spikes;
+
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+      x = cx + Math.cos(rot) * outerRadius;
+      y = cy + Math.sin(rot) * outerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
+
+      x = cx + Math.cos(rot) * innerRadius;
+      y = cy + Math.sin(rot) * innerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
     }
-    cur.x += (target.x - cur.x) * 0.12;
-    cur.y += (target.y - cur.y) * 0.12;
-    // Active rotation phase for the pinwheel spin.
-    const t = performance.now() / 1000;
-    const ma = Math.sin(t * 1.5) * 0.5 + Math.sin(t * 0.9) * 0.5;
-    root.style.setProperty('--mx', cur.x.toFixed(3));
-    root.style.setProperty('--my', cur.y.toFixed(3));
-    root.style.setProperty('--ma', ma.toFixed(3));
-    raf = requestAnimationFrame(tick);
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
-  raf = requestAnimationFrame(tick);
 
-  // Tap: restart the underline draw.
-  function onPointerDown() {
-    const fill = root.querySelector('.ng-underline-fill');
-    fill.classList.remove('ng-redraw');
-    void fill.offsetWidth;
-    fill.classList.add('ng-redraw');
+  function spawnStars(tx, ty) {
+    for (let i = 0; i < 12; i++) {
+      particles.push({
+        x: tx,
+        y: ty,
+        vx: (Math.random() - 0.5) * 3,
+        vy: (Math.random() - 0.6) * 3 - 1, // slight upward bias
+        size: 5 + Math.random() * 5,
+        color: `hsla(42, ${75 + Math.random() * 20}%, 70%, 0.85)`,
+        opacity: 1.0,
+        decay: 0.015 + Math.random() * 0.01
+      });
+    }
+
+    if (window.audioEngineInstance) {
+      window.audioEngineInstance.playInteractionTone();
+    }
   }
-  container.addEventListener('pointerdown', onPointerDown, { passive: true });
+
+  wrap.addEventListener('pointerdown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    const y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    spawnStars(x, y);
+  });
+
+  function draw() {
+    if (!active) return;
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05; // soft gravity
+      p.opacity -= p.decay;
+
+      if (p.opacity <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = p.opacity;
+      drawStar(ctx, p.x, p.y, 5, p.size, p.size * 0.4, p.color);
+      ctx.restore();
+    }
+
+    animationFrameId = requestAnimationFrame(draw);
+  }
+
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      vis.destroy();
-      container.removeEventListener('pointermove', onPointerMove);
-      container.removeEventListener('pointerleave', onPointerLeave);
-      container.removeEventListener('pointerdown', onPointerDown);
-      container.innerHTML = '';
-    },
+      active = false;
+      cancelAnimationFrame(animationFrameId);
+      wrap.remove();
+    }
   };
 }

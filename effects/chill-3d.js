@@ -1,366 +1,187 @@
-// effects/chill-3d.js — Peaceful floating-island dreamscape.
-// Three.js scene: floating island (icosphere + vertex displacement),
-// slow-drifting petals, gradient sky dome, subtle fog.
-// Drag = orbit, scroll = zoom, auto-rotate when idle.
-// No enemies, no timer, no fail state.
-
-import * as THREE from 'three';
-import { getDpr } from '../lib/dpr.js';
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { isDocumentVisible } from '../lib/visibility.js';
-
-const VARIANT_THEMES = {
-  'Meadow': {
-    island: [0.65, 0.85, 0.65],
-    sky: [0.45, 0.65, 0.9],
-    fog: [0.7, 0.8, 0.95],
-    petal: [0.95, 0.82, 0.88],
-  },
-  'Sunset': {
-    island: [0.85, 0.65, 0.55],
-    sky: [0.95, 0.55, 0.45],
-    fog: [0.95, 0.75, 0.65],
-    petal: [0.95, 0.72, 0.58],
-  },
-  'Twilight': {
-    island: [0.45, 0.45, 0.65],
-    sky: [0.2, 0.15, 0.35],
-    fog: [0.35, 0.3, 0.55],
-    petal: [0.75, 0.55, 0.82],
-  },
-  'Ocean': {
-    island: [0.45, 0.65, 0.75],
-    sky: [0.3, 0.55, 0.8],
-    fog: [0.55, 0.72, 0.88],
-    petal: [0.65, 0.82, 0.92],
-  },
-  'Lavender': {
-    island: [0.65, 0.55, 0.75],
-    sky: [0.6, 0.55, 0.8],
-    fog: [0.75, 0.7, 0.88],
-    petal: [0.85, 0.72, 0.92],
-  },
-};
-
-const VARIANT_NAMES = Object.keys(VARIANT_THEMES);
-
-// Simple orbit controls (no OrbitControls dependency).
-function createOrbitControls(camera, domEl) {
-  let isDragging = false;
-  let lastX = 0, lastY = 0;
-  let theta = Math.PI * 0.25; // horizontal angle
-  let phi = Math.PI * 0.35;   // vertical angle
-  let radius = 5;
-  let target = new THREE.Vector3(0, 0.3, 0);
-  let autoRotate = true;
-  let autoRotateSpeed = 0.1; // rad/s
-  let idleTimer = 0;
-  const IDLE_DELAY = 2; // seconds before auto-rotate resumes
-
-  function update() {
-    camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
-    camera.position.y = target.y + radius * Math.cos(phi);
-    camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
-    camera.lookAt(target);
-  }
-
-  function onDown(e) {
-    isDragging = true;
-    autoRotate = false;
-    idleTimer = 0;
-    lastX = e.clientX;
-    lastY = e.clientY;
-  }
-  function onMove(e) {
-    if (!isDragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    theta -= dx * 0.005;
-    phi -= dy * 0.005;
-    phi = Math.max(0.1, Math.min(Math.PI * 0.45, phi));
-    update();
-  }
-  function onUp() {
-    isDragging = false;
-  }
-  function onWheel(e) {
-    e.preventDefault();
-    radius += e.deltaY * 0.005;
-    radius = Math.max(2, Math.min(12, radius));
-    update();
-  }
-
-  domEl.addEventListener('pointerdown', onDown);
-  domEl.addEventListener('pointermove', onMove);
-  domEl.addEventListener('pointerup', onUp);
-  domEl.addEventListener('pointercancel', onUp);
-  domEl.addEventListener('wheel', onWheel, { passive: false });
-
-  update();
-
-  return {
-    update(dt) {
-      if (!isDragging) {
-        idleTimer += dt;
-        if (idleTimer > IDLE_DELAY) {
-          autoRotate = true;
-        }
-      }
-      if (autoRotate) {
-        theta += autoRotateSpeed * dt;
-        update();
-      }
-    },
-    destroy() {
-      domEl.removeEventListener('pointerdown', onDown);
-      domEl.removeEventListener('pointermove', onMove);
-      domEl.removeEventListener('pointerup', onUp);
-      domEl.removeEventListener('pointercancel', onUp);
-      domEl.removeEventListener('wheel', onWheel);
-    },
-  };
-}
+// effects/chill-3d.js — Calming pseudo-3D floating-island dreamscape in Canvas2D
 
 export function mountChill3D(container, opts = {}) {
-  const dpr = getDpr();
-  const reduced = prefersReducedMotion();
-  const quality = document.body.dataset.quality || 'full';
+  const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
+  container.appendChild(canvas);
 
-  const themeName = opts.variant || 'Meadow';
-  const theme = VARIANT_THEMES[themeName] || VARIANT_THEMES['Meadow'];
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
 
-  // Renderer.
-  const renderer = new THREE.WebGLRenderer({
-    antialias: quality !== 'minimal',
-    alpha: false,
-    preserveDrawingBuffer: true,
-    powerPreference: 'low-power',
-  });
-  renderer.setPixelRatio(dpr);
-  if (quality === 'minimal') {
-    renderer.shadowMap.enabled = false;
-  }
-  container.appendChild(renderer.domElement);
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
 
-  // Scene.
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(...theme.sky);
-  if (quality !== 'minimal') {
-    scene.fog = new THREE.FogExp2(new THREE.Color(...theme.fog).getHex(), 0.04);
+  let dragOffset = 0;
+  let targetDragOffset = 0;
+  let dragging = false;
+  let startX = 0;
+
+  function onPointerDown(e) {
+    dragging = true;
+    startX = e.clientX;
   }
 
-  // Camera.
-  const camera = new THREE.PerspectiveCamera(
-    50,
-    container.clientWidth / container.clientHeight,
-    0.1,
-    100
-  );
+  function onPointerMove(e) {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    targetDragOffset += dx * 0.4;
+    startX = e.clientX;
+  }
 
-  // Orbit controls.
-  const controls = createOrbitControls(camera, renderer.domElement);
+  function onPointerUp() {
+    dragging = false;
+  }
 
-  // Lights.
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
+  canvas.addEventListener('pointerdown', onPointerDown, { passive: true });
+  canvas.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', onPointerUp, { passive: true });
 
-  const dirLight = new THREE.DirectionalLight(0xfff5e0, 0.8);
-  dirLight.position.set(3, 5, 2);
-  scene.add(dirLight);
+  let time = 0;
 
-  // Sky dome — large sphere with gradient.
-  const skyGeo = new THREE.SphereGeometry(50, 32, 16);
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    uniforms: {
-      uTop: { value: new THREE.Color(...theme.sky) },
-      uBottom: { value: new THREE.Color(...theme.fog) },
-    },
-    vertexShader: /* glsl */`
-      varying vec3 vWorldPos;
-      void main() {
-        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */`
-      uniform vec3 uTop;
-      uniform vec3 uBottom;
-      varying vec3 vWorldPos;
-      void main() {
-        float h = normalize(vWorldPos).y;
-        float t = smoothstep(-0.2, 0.8, h);
-        gl_FragColor = vec4(mix(uBottom, uTop, t), 1.0);
-      }
-    `,
-  });
-  scene.add(new THREE.Mesh(skyGeo, skyMat));
+  function draw() {
+    if (!active) return;
+    time += 0.015;
 
-  // Floating island — icosphere with vertex displacement.
-  const islandSegs = quality === 'minimal' ? 2 : quality === 'reduced' ? 3 : 4;
-  const islandGeo = new THREE.IcosahedronGeometry(1.2, islandSegs);
-  // Displace vertices for organic look.
-  const posAttr = islandGeo.attributes.position;
-  for (let i = 0; i < posAttr.count; i++) {
-    const x = posAttr.getX(i);
-    const y = posAttr.getY(i);
-    const z = posAttr.getZ(i);
-    const noise = Math.sin(x * 3) * Math.cos(z * 3) * 0.15
-                + Math.sin(y * 5 + x * 2) * 0.08;
-    posAttr.setY(i, y + noise);
-    // Flatten bottom.
-    if (y < -0.3) {
-      posAttr.setY(i, -0.3 + (y + 0.3) * 0.3);
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    // 1. Sky Gradient (twilight sky)
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    skyGrad.addColorStop(0, 'hsl(208, 86%, 85%)');   // sky blue
+    skyGrad.addColorStop(0.5, 'hsl(265, 56%, 88%)'); // lavender
+    skyGrad.addColorStop(1, 'hsl(16, 100%, 90%)');    // peach
+    
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    // Filter drag offset back to center slowly over time (auto-rotate/return)
+    dragOffset += (targetDragOffset - dragOffset) * 0.1;
+    if (!dragging) {
+      targetDragOffset += (0 - targetDragOffset) * 0.02; // slow return to center
     }
-  }
-  islandGeo.computeVertexNormals();
 
-  const islandMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(...theme.island),
-    roughness: 0.85,
-    metalness: 0.05,
-    flatShading: true,
-  });
-  const island = new THREE.Mesh(islandGeo, islandMat);
-  island.position.y = 0;
-  scene.add(island);
+    // Gentle vertical bob (6s period)
+    const bob = Math.sin(time * (2 * Math.PI / 6.0)) * 6;
 
-  // Tiny trees on island (cones).
-  const treeGeos = [];
-  const treeMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0.3, 0.55, 0.35),
-    flatShading: true,
-  });
-  for (let i = 0; i < 5; i++) {
-    const treeGeo = new THREE.ConeGeometry(0.06, 0.2, 5);
-    treeGeos.push(treeGeo);
-    const tree = new THREE.Mesh(treeGeo, treeMat);
-    const angle = (i / 5) * Math.PI * 2;
-    const r = 0.3 + Math.random() * 0.4;
-    tree.position.set(Math.cos(angle) * r, 0.8, Math.sin(angle) * r);
-    tree.rotation.z = (Math.random() - 0.5) * 0.3;
-    island.add(tree);
-  }
+    const cx = WIDTH / 2;
+    const cy = HEIGHT / 2 + bob;
 
-  // Petals — transparent planes drifting in foreground.
-  const petals = [];
-  if (quality !== 'minimal') {
-    const petalMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(...theme.petal),
-      transparent: true,
-      opacity: 0.6,
-      side: THREE.DoubleSide,
+    // Draw background elements (parallax back clouds)
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.beginPath();
+    ctx.arc(cx - 30 + dragOffset * 0.2, cy - 40, 20, 0, Math.PI * 2);
+    ctx.arc(cx - 15 + dragOffset * 0.2, cy - 45, 25, 0, Math.PI * 2);
+    ctx.arc(cx + dragOffset * 0.2, cy - 40, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 2. Island Base (bottom dirt/rock block)
+    ctx.save();
+    ctx.fillStyle = 'hsl(16, 40%, 65%)'; // brown dirt
+    ctx.beginPath();
+    ctx.moveTo(cx - 60, cy);
+    // Displaced rocky lines
+    ctx.lineTo(cx - 40 + dragOffset * 0.4, cy + 30);
+    ctx.lineTo(cx + dragOffset * 0.5, cy + 45);
+    ctx.lineTo(cx + 40 + dragOffset * 0.4, cy + 30);
+    ctx.lineTo(cx + 60, cy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Rocky layers
+    ctx.fillStyle = 'hsl(16, 30%, 55%)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 30 + dragOffset * 0.45, cy);
+    ctx.lineTo(cx + dragOffset * 0.5, cy + 30);
+    ctx.lineTo(cx + 30 + dragOffset * 0.45, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // 3. Island Top (green grass)
+    ctx.save();
+    ctx.fillStyle = 'hsl(144, 45%, 72%)'; // green grass
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 60, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Shiny highlight on grass edge
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 58, 13, 0, Math.PI, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. Draw trees with 3D parallax offset
+    const trees = [
+      { rx: -30, ry: -5, size: 16, color: 'hsl(144, 40%, 55%)' },
+      { rx: 0, ry: 2, size: 22, color: 'hsl(144, 35%, 48%)' },
+      { rx: 25, ry: -3, size: 14, color: 'hsl(144, 45%, 60%)' }
+    ];
+
+    trees.forEach((t) => {
+      // Parallax horizontal position based on dragOffset
+      const tx = cx + t.rx + dragOffset * 0.7;
+      const ty = cy + t.ry;
+
+      // Draw trunk
+      ctx.fillStyle = 'hsl(16, 50%, 35%)';
+      ctx.fillRect(tx - 2, ty - 12, 4, 12);
+
+      // Draw canopy (cone/triangle)
+      ctx.fillStyle = t.color;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 12 - t.size);
+      ctx.lineTo(tx - t.size / 2, ty - 10);
+      ctx.lineTo(tx + t.size / 2, ty - 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Highlight on tree canopy
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 12 - t.size);
+      ctx.lineTo(tx - t.size / 2, ty - 10);
+      ctx.lineTo(tx, ty - 10);
+      ctx.closePath();
+      ctx.fill();
     });
-    for (let i = 0; i < 5; i++) {
-      const petalGeo = new THREE.PlaneGeometry(0.3, 0.15);
-      const petal = new THREE.Mesh(petalGeo, petalMat.clone());
-      petal.position.set(
-        (Math.random() - 0.5) * 6,
-        (Math.random() - 0.5) * 3,
-        (Math.random() - 0.5) * 6
-      );
-      petal.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      petal.userData = {
-        speed: 0.05 + Math.random() * 0.1,
-        rotSpeed: (Math.random() - 0.5) * 0.3,
-        floatPhase: Math.random() * Math.PI * 2,
-      };
-      scene.add(petal);
-      petals.push(petal);
-    }
+
+    // 5. Floating particle petals
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 107, 157, 0.7)'; // pink drifting petals
+    const petalX1 = cx - 40 + Math.sin(time * 2) * 10 + dragOffset * 0.9;
+    const petalY1 = cy - 20 + Math.cos(time) * 5;
+    ctx.beginPath();
+    ctx.arc(petalX1, petalY1, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    const petalX2 = cx + 30 + Math.cos(time * 1.5) * 8 + dragOffset * 0.9;
+    const petalY2 = cy - 35 + Math.sin(time * 2) * 5;
+    ctx.beginPath();
+    ctx.arc(petalX2, petalY2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    animationFrameId = requestAnimationFrame(draw);
   }
 
-  // Resize.
-  function resize() {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
-  }
-  resize();
-  const ro = new ResizeObserver(resize);
-  ro.observe(container);
-
-  // RAF loop.
-  let raf = 0;
-  const clock = new THREE.Clock();
-
-  function frame() {
-    if (!isDocumentVisible()) {
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-    const dt = clock.getDelta();
-    const t = clock.elapsedTime;
-
-    controls.update(dt);
-
-    // Slow island bob.
-    island.position.y = Math.sin(t * 0.5) * 0.08;
-    island.rotation.y += dt * 0.05;
-
-    // Petal drift.
-    for (const p of petals) {
-      const u = p.userData;
-      p.position.y += Math.sin(t * u.speed + u.floatPhase) * 0.002;
-      p.position.x += Math.sin(t * 0.1 + u.floatPhase) * 0.001;
-      p.rotation.x += u.rotSpeed * dt * 0.3;
-      p.rotation.z += u.rotSpeed * dt * 0.2;
-    }
-
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(frame);
-  }
-
-  if (!reduced) {
-    raf = requestAnimationFrame(frame);
-  } else {
-    renderer.render(scene, camera);
-  }
-
-  // Variant cycling.
-  let currentVariant = themeName;
-  function setVariant(name) {
-    if (!VARIANT_THEMES[name]) return;
-    currentVariant = name;
-    const t = VARIANT_THEMES[name];
-    scene.background = new THREE.Color(...t.sky);
-    skyMat.uniforms.uTop.value = new THREE.Color(...t.sky);
-    skyMat.uniforms.uBottom.value = new THREE.Color(...t.fog);
-    islandMat.color = new THREE.Color(...t.island);
-    if (scene.fog) scene.fog.color = new THREE.Color(...t.fog);
-    for (const p of petals) {
-      p.material.color = new THREE.Color(...t.petal);
-    }
-  }
+  draw();
 
   return {
     destroy() {
-      if (raf) cancelAnimationFrame(raf);
-      ro.disconnect();
-      controls.destroy();
-      islandGeo.dispose();
-      islandMat.dispose();
-      skyGeo.dispose();
-      skyMat.dispose();
-      for (const p of petals) {
-        p.geometry.dispose();
-        p.material.dispose();
-      }
-      treeGeos.forEach(g => g.dispose());
-      treeMat.dispose();
-      renderer.dispose();
-      if (renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
-    },
-    setVariant,
+      active = false;
+      cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      canvas.remove();
+    }
   };
 }

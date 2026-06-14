@@ -1,210 +1,170 @@
-// effects/soap-bubble.js — Iridescent soap bubble.
-// Three.js sphere with a thin-film interference shader.
-// Floats slowly (vertical sine drift). Tap = soft dissolve (1.2s),
-// respawn 2s later at a new position. Never violent.
+// effects/soap-bubble.js — Iridescent soap bubble
 
-import * as THREE from 'three';
-import { getDpr } from '../lib/dpr.js';
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
-
-const VERT = /* glsl */`
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
-  varying vec3 vWorldPos;
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPos.xyz;
-    vNormal = normalize(normalMatrix * normal);
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    vViewDir = normalize(-mv.xyz);
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-// Iridescent thin-film: faked with a hue modulated by fresnel + time.
-const FRAG = /* glsl */`
-  precision highp float;
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
-  varying vec3 vWorldPos;
-  uniform float uTime;
-  uniform float uFade;       // 1.0 visible, 0.0 dissolved
-  uniform float uSpawn;      // 0..1, brief glow on respawn
-
-  vec3 hsl2rgb(vec3 c) {
-    vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
-    return c.z + c.y * (p - 1.5) * (1.0 - abs(2.0 * c.z - 1.0));
-  }
-
-  void main() {
-    vec3 N = normalize(vNormal);
-    vec3 V = normalize(vViewDir);
-    float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
-
-    // Thin-film hue shift based on fresnel + a slow time.
-    float hue = fract(fres * 1.4 + uTime * 0.04 + vWorldPos.y * 0.05);
-    vec3 iridescent = hsl2rgb(vec3(hue, 0.55, 0.78));
-
-    // Soft inner color.
-    vec3 base = hsl2rgb(vec3(0.58, 0.30, 0.92));
-
-    vec3 col = mix(base, iridescent, fres);
-    col += vec3(1.0) * pow(fres, 6.0) * 0.6; // specular hint
-
-    // Spawn glow.
-    col += vec3(1.0, 0.95, 0.97) * uSpawn * 0.4;
-
-    // Fade.
-    col *= uFade;
-    float alpha = (0.55 + 0.45 * fres) * uFade;
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
-
-export function mountSoapBubble(container) {
+export function mountSoapBubble(container, opts = {}) {
   const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
   container.appendChild(canvas);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(getDpr());
-  renderer.setClearColor(0x000000, 0);
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-  camera.position.z = 3.0;
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
 
-  const uniforms = {
-    uTime:  { value: 0 },
-    uFade:  { value: 0 },
-    uSpawn: { value: 0 },
+  let bubble = {
+    x: WIDTH / 2,
+    y: HEIGHT / 2,
+    baseY: HEIGHT / 2,
+    r: 50,
+    opacity: 1.0,
+    dissolving: false,
+    respawnTimer: null,
+    phase: Math.random() * 10
   };
 
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    uniforms,
-    transparent: true,
-    depthWrite: false,
-  });
-
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.7, 64, 64), mat);
-  scene.add(mesh);
-
-  const reduced = prefersReducedMotion();
-  const vis = createVisibilityObserver(canvas);
-
-  // Phase: 'appearing' (spawn glow), 'idle' (drift), 'dissolving', 'gone'.
-  let phase = 'appearing';
-  let phaseT = 0;
-  let fade = 0;
-  let spawn = 0;
-  let drift = 0;
-  const driftAmp = 0.18;
-  const driftPeriod = 6.0;
-  // Mouse follow (bubble drifts toward pointer when hovered).
-  const target = { x: 0, y: 0 };
-  const cur = { x: 0, y: 0 };
+  let mouse = { x: 0, y: 0, hover: false };
 
   function onPointerMove(e) {
-    const r = canvas.getBoundingClientRect();
-    target.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-    target.y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    mouse.y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    mouse.hover = true;
   }
-  function onPointerLeave() { target.x = 0; target.y = 0; }
-  function onPointerDown() {
-    if (phase === 'idle' || phase === 'appearing') {
-      phase = 'dissolving';
-      phaseT = 0;
-      const rect = canvas.getBoundingClientRect();
-      const x = rect.width / 2;
-      const y = rect.height / 2;
-      import('../lib/party-explosion.js').then(m => {
-        m.createExplosion(container, x, y, 'sparkles');
-      });
+
+  function onPointerLeave() {
+    mouse.hover = false;
+  }
+
+  function onPointerDown(e) {
+    if (bubble.dissolving) return;
+
+    // Check if tap hit the bubble
+    const dist = Math.hypot(mouse.x - bubble.x, mouse.y - bubble.y);
+    if (dist <= bubble.r + 15) {
+      popBubble();
     }
   }
+
+  function popBubble() {
+    bubble.dissolving = true;
+    
+    // Play sound callback if attached
+    if (window.audioEngineInstance) {
+      window.audioEngineInstance.playInteractionTone();
+    }
+
+    // Trigger respawn in 2 seconds
+    bubble.respawnTimer = setTimeout(() => {
+      bubble.dissolving = false;
+      bubble.opacity = 0;
+      bubble.baseY = HEIGHT / 2;
+      bubble.x = WIDTH / 2;
+    }, 2000);
+  }
+
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });
   canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
   canvas.addEventListener('pointerdown', onPointerDown, { passive: true });
 
-  function resize() {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (w === 0 || h === 0) return;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  resize();
-  const ro = new ResizeObserver(resize);
-  ro.observe(container);
+  let time = 0;
 
-  const clock = new THREE.Clock();
-  let raf = 0;
-  function frame() {
-    if (!shouldRender(canvas, vis)) {
-      raf = requestAnimationFrame(frame);
-      return;
+  function draw() {
+    if (!active) return;
+    time += 0.015;
+
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    // Fade animation logic
+    if (bubble.dissolving) {
+      bubble.opacity = Math.max(0, bubble.opacity - 0.08); // soft dissolve
+      bubble.r = Math.max(0, bubble.r - 2.0);
+    } else if (bubble.opacity < 1.0) {
+      bubble.opacity = Math.min(1.0, bubble.opacity + 0.05); // soft spawn
+      bubble.r = Math.min(50, bubble.r + 1.5);
     }
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
-    phaseT += dt;
 
-    // Phase machine.
-    if (phase === 'appearing') {
-      spawn = Math.max(0, 1 - phaseT / 0.6);
-      fade = Math.min(1, phaseT / 0.5);
-      if (phaseT > 0.6) { phase = 'idle'; phaseT = 0; }
-    } else if (phase === 'idle') {
-      spawn *= Math.exp(-dt / 0.3);
-      fade = 1;
-      drift = Math.sin(t * (2 * Math.PI / driftPeriod)) * driftAmp;
-      // Mouse follow with strong damping.
-      const damp = 1 - Math.exp(-dt / 0.2);
-      cur.x += (target.x - cur.x) * damp;
-      cur.y += (target.y - cur.y) * damp;
-    } else if (phase === 'dissolving') {
-      fade = Math.max(0, 1 - phaseT / 1.2);
-      spawn = 0;
-      if (phaseT > 1.2) { phase = 'gone'; phaseT = 0; }
-    } else if (phase === 'gone') {
-      // 2s respawn delay.
-      if (phaseT > 2.0) {
-        phase = 'appearing';
-        phaseT = 0;
-        spawn = 1;
-        fade = 0;
+    if (bubble.opacity > 0) {
+      // Slow vertical drift (sine wave 6s cycle)
+      bubble.y = bubble.baseY + Math.sin(time * (2 * Math.PI / 6.0) + bubble.phase) * 12;
+
+      // Gentle drift toward pointer
+      if (mouse.hover && !bubble.dissolving) {
+        bubble.x += (mouse.x - bubble.x) * 0.06;
+        bubble.baseY += (mouse.y - bubble.baseY) * 0.06;
       }
+
+      ctx.save();
+      ctx.globalAlpha = bubble.opacity;
+
+      // 1. Draw outer iridescent ring
+      const borderGrad = ctx.createRadialGradient(
+        bubble.x - 5, bubble.y - 5, bubble.r - 8,
+        bubble.x, bubble.y, bubble.r
+      );
+      // Soft hope colors: pink, violet, blue, teal
+      borderGrad.addColorStop(0, 'rgba(167, 139, 250, 0.1)'); // violet
+      borderGrad.addColorStop(0.3, 'rgba(96, 165, 250, 0.4)'); // blue
+      borderGrad.addColorStop(0.6, 'rgba(52, 211, 197, 0.5)'); // teal
+      borderGrad.addColorStop(0.9, 'rgba(255, 107, 157, 0.6)'); // pink
+      borderGrad.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
+
+      ctx.strokeStyle = borderGrad;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(bubble.x, bubble.y, bubble.r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 2. Draw soft inner body glow
+      const innerGrad = ctx.createRadialGradient(
+        bubble.x - 10, bubble.y - 10, 0,
+        bubble.x, bubble.y, bubble.r
+      );
+      innerGrad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+      innerGrad.addColorStop(0.5, 'rgba(167, 139, 250, 0.05)');
+      innerGrad.addColorStop(0.9, 'rgba(96, 165, 250, 0.08)');
+      innerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = innerGrad;
+      ctx.beginPath();
+      ctx.arc(bubble.x, bubble.y, bubble.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Highlight/Glare (white reflection arc)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      // Curved arc at top-left
+      ctx.arc(bubble.x, bubble.y, bubble.r - 6, Math.PI * 1.05, Math.PI * 1.55);
+      ctx.stroke();
+
+      // Soft reflection spot
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.beginPath();
+      ctx.arc(bubble.x + bubble.r * 0.4, bubble.y + bubble.r * 0.4, bubble.r * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
     }
 
-    mesh.position.x = cur.x * 0.6;
-    mesh.position.y = drift + cur.y * 0.6;
-    // Active spin like a pinwheel — multiple axes, fast.
-    mesh.rotation.y = t * 0.6;
-    mesh.rotation.x = Math.sin(t * 0.5) * 0.4;
-    mesh.rotation.z = t * 0.25;
-    mesh.scale.setScalar(0.92 + 0.10 * Math.sin(t * 1.2));
-
-    uniforms.uTime.value = t;
-    uniforms.uFade.value = fade;
-    uniforms.uSpawn.value = spawn;
-
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(frame);
+    animationFrameId = requestAnimationFrame(draw);
   }
-  raf = requestAnimationFrame(frame);
+
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      vis.destroy();
+      active = false;
+      cancelAnimationFrame(animationFrameId);
+      clearTimeout(bubble.respawnTimer);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('pointerdown', onPointerDown);
-      mesh.geometry.dispose();
-      mat.dispose();
-      renderer.dispose();
       canvas.remove();
-    },
+    }
   };
 }

@@ -1,193 +1,122 @@
-// effects/aurora-ribbon.js — WebGL ribbon with vertex displacement.
-// Slow rainbow color flow (12s period), pointer horizontally
-// displaces the wave with a soft 1.5s return.
+// effects/aurora-ribbon.js — Calming traveling ribbon waves in Canvas2D
 
-import * as THREE from 'three';
-import { getDpr } from '../lib/dpr.js';
-import { prefersReducedMotion } from '../lib/reduced-motion.js';
-import { shouldRender, createVisibilityObserver } from '../lib/visibility.js';
-import { pointerDamp } from '../lib/easing.js';
-
-const VERT = /* glsl */`
-  precision highp float;
-  uniform float uTime;
-  uniform float uPointer;     // -1..1
-  uniform float uPhase;       // 0..1
-  attribute float aSide;      // -1 (left) or +1 (right)
-  varying float vSide;
-  varying float vZ;
-  varying float vHue;
-
-  vec3 hsl2rgb(vec3 c) {
-    vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
-    return c.z + c.y * (p - 1.5) * (1.0 - abs(2.0 * c.z - 1.0));
-  }
-
-  void main() {
-    vSide = aSide;
-    vec3 p = position;
-
-    // Active pinwheel-spinning waves.
-    float t = uTime * 1.0;
-    float wave = sin(p.x * 2.0 + t) * 0.26
-               + sin(p.x * 3.6 - t * 0.8 + 1.3) * 0.14
-               + sin(p.x * 5.3 + t * 1.3) * 0.08
-               + sin(p.x * 8.0 - t * 1.7) * 0.04;
-
-    // Pointer bias — pushes the wave up dramatically where the pointer is.
-    float px = uPointer;
-    float localX = p.x - px;
-    // Tighter falloff + bigger amplitude = a clear wave bump under cursor.
-    float push = exp(-localX * localX * 1.0) * 0.7;
-
-    p.z += wave + push;
-
-    vZ = p.z;
-    vHue = fract(p.x * 0.15 + uTime * 0.04 + uPhase);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-  }
-`;
-
-const FRAG = /* glsl */`
-  precision highp float;
-  varying float vSide;
-  varying float vZ;
-  varying float vHue;
-  uniform float uAlpha;
-
-  vec3 hsl2rgb(vec3 c) {
-    vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
-    return c.z + c.y * (p - 1.5) * (1.0 - abs(2.0 * c.z - 1.0));
-  }
-
-  void main() {
-    vec3 col = hsl2rgb(vec3(vHue, 0.55, 0.72));
-    // Subtle bright ridge at peaks.
-    col += vec3(1.0) * smoothstep(0.05, 0.25, vZ) * 0.15;
-    // Soft edges (left/right).
-    float edge = 1.0 - pow(abs(vSide), 3.0);
-    float a = uAlpha * edge;
-    gl_FragColor = vec4(col, a);
-  }
-`;
-
-export function mountAuroraRibbon(container) {
+export function mountAuroraRibbon(container, opts = {}) {
   const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
   container.appendChild(canvas);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(getDpr());
-  renderer.setClearColor(0x000000, 0);
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+  let active = true;
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-  camera.position.set(0, 0, 3.0);
+  const WIDTH = 200;
+  const HEIGHT = 200;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
 
-  // Build a long ribbon: 200 segments × 2 vertices wide.
-  const N = 200;
-  const positions = new Float32Array(N * 2 * 3);
-  const sides     = new Float32Array(N * 2);
-  const indices   = [];
+  // Mouse bias
+  let mouse = { x: 100, y: 100, active: false };
 
-  for (let i = 0; i < N; i++) {
-    const x = (i / (N - 1)) * 4.0 - 2.0; // x in [-2, 2]
-    const y = 0.10;                       // thickness
-    // top vertex
-    positions[i * 6 + 0] = x;
-    positions[i * 6 + 1] = y;
-    positions[i * 6 + 2] = 0;
-    sides[i * 2 + 0] = -1;
-    // bottom vertex
-    positions[i * 6 + 3] = x;
-    positions[i * 6 + 4] = -y;
-    positions[i * 6 + 5] = 0;
-    sides[i * 2 + 1] = +1;
-  }
-  for (let i = 0; i < N - 1; i++) {
-    const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
-    indices.push(a, b, c, b, d, c);
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('aSide',    new THREE.BufferAttribute(sides, 1));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-
-  const uniforms = {
-    uTime:   { value: 0 },
-    uPointer:{ value: 0 },
-    uPhase:  { value: Math.random() * 6.28 },
-    uAlpha:  { value: 0.85 },
-  };
-
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    uniforms,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-
-  const mesh = new THREE.Mesh(geo, mat);
-  scene.add(mesh);
-
-  const reduced = prefersReducedMotion();
-  const vis = createVisibilityObserver(canvas);
-
-  let targetPointer = 0;
   function onPointerMove(e) {
-    const r = canvas.getBoundingClientRect();
-    targetPointer = ((e.clientX - r.left) / r.width) * 2 - 1;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    mouse.y = ((e.clientY - rect.top) / rect.height) * HEIGHT;
+    mouse.active = true;
   }
-  function onPointerLeave() { targetPointer = 0; }
+
+  function onPointerLeave() {
+    mouse.active = false;
+  }
+
   canvas.addEventListener('pointermove', onPointerMove, { passive: true });
   canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
 
-  function resize() {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (w === 0 || h === 0) return;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+  let time = 0;
+
+  function draw() {
+    if (!active) return;
+    time += 0.015;
+
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+    // Deep calm void background inside card
+    ctx.fillStyle = 'rgba(15, 10, 30, 0.95)';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    // Draw 3 layers of glowing ribbon waves
+    const layers = [
+      { amp: 16, freq: 0.03, speed: 1.5, hueOffset: 0, opacity: 0.35, thickness: 12 },
+      { amp: 12, freq: 0.045, speed: 2.2, hueOffset: 60, opacity: 0.45, thickness: 8 },
+      { amp: 8, freq: 0.06, speed: 0.8, hueOffset: 120, opacity: 0.3, thickness: 16 }
+    ];
+
+    layers.forEach((lyr) => {
+      ctx.save();
+      ctx.beginPath();
+      
+      const wavePoints = [];
+      for (let x = 0; x <= WIDTH; x += 4) {
+        // Base sine wave
+        let y = HEIGHT / 2 + Math.sin(x * lyr.freq + time * lyr.speed) * lyr.amp;
+        
+        // Add second harmonic for FBM noise-like complexity
+        y += Math.cos(x * 0.08 - time * 1.5) * 4;
+
+        // Pointer warp
+        if (mouse.active) {
+          const dx = x - mouse.x;
+          const dist = Math.abs(dx);
+          if (dist < 60) {
+            const pull = (60 - dist) / 60;
+            y += (mouse.y - y) * pull * 0.6;
+          }
+        }
+        
+        wavePoints.push({ x, y });
+      }
+
+      // Draw top of ribbon
+      ctx.moveTo(wavePoints[0].x, wavePoints[0].y - lyr.thickness);
+      for (let i = 1; i < wavePoints.length; i++) {
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].y - lyr.thickness);
+      }
+      
+      // Loop around to bottom of ribbon
+      for (let i = wavePoints.length - 1; i >= 0; i--) {
+        ctx.lineTo(wavePoints[i].x, wavePoints[i].y + lyr.thickness);
+      }
+      ctx.closePath();
+
+      // Soft HSL colors shifted over time (rainbow capped at 70% sat)
+      const baseHue = (time * 12 + lyr.hueOffset) % 360;
+      const gradient = ctx.createLinearGradient(0, 0, WIDTH, 0);
+      gradient.addColorStop(0, `hsla(${baseHue}, 70%, 75%, 0)`);
+      gradient.addColorStop(0.5, `hsla(${baseHue}, 70%, 75%, ${lyr.opacity})`);
+      gradient.addColorStop(1, `hsla(${baseHue}, 70%, 75%, 0)`);
+
+      ctx.fillStyle = gradient;
+      // Add soft glow effect
+      ctx.shadowColor = `hsla(${baseHue}, 70%, 75%, ${lyr.opacity * 0.8})`;
+      ctx.shadowBlur = 10;
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+    animationFrameId = requestAnimationFrame(draw);
   }
-  resize();
-  const ro = new ResizeObserver(resize);
-  ro.observe(container);
 
-  const clock = new THREE.Clock();
-  let raf = 0;
-  function frame() {
-    if (!shouldRender(canvas, vis)) {
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
-
-    const damp = pointerDamp(dt, 0.3);
-    uniforms.uPointer.value += (targetPointer - uniforms.uPointer.value) * damp;
-    uniforms.uTime.value = t;
-    uniforms.uAlpha.value = 0.85;
-
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(frame);
-  }
-  raf = requestAnimationFrame(frame);
+  draw();
 
   return {
     destroy() {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      vis.destroy();
+      active = false;
+      cancelAnimationFrame(animationFrameId);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerleave', onPointerLeave);
-      geo.dispose();
-      mat.dispose();
-      renderer.dispose();
       canvas.remove();
-    },
+    }
   };
 }
