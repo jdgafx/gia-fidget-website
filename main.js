@@ -90,6 +90,7 @@ const perfMonitor = createPerfMonitor();
 
 const passiveMode = createPassiveMode({
   onPassive() {
+    if (isWelcomeVisible) return;
     document.body.classList.add('passive');
     ambient.setSpeed(0.2);
     audioEngine.swellAmbient();
@@ -109,6 +110,44 @@ let cardIndex = 0;
 
 // Track spawned cards for variant cycling and effect capping.
 const spawnedCards = []; // { card, ft, effectKey, variant }
+
+// ---------- Welcome card ----------
+let isWelcomeVisible = false;
+let welcomeCardEl = null;
+let welcomeDismissTimer = null;
+
+function initWelcomeCard() {
+  if (sessionStorage.getItem('gia-welcome-dismissed')) return;
+  welcomeCardEl = document.getElementById('welcome-card');
+  if (!welcomeCardEl) return;
+  isWelcomeVisible = true;
+
+  const btn = welcomeCardEl.querySelector('.welcome-btn');
+  btn.addEventListener('click', dismissWelcomeCard);
+}
+
+function dismissWelcomeCard() {
+  if (!isWelcomeVisible || !welcomeCardEl) return;
+  isWelcomeVisible = false;
+  welcomeCardEl.classList.add('dismissing');
+  sessionStorage.setItem('gia-welcome-dismissed', '1');
+  clearTimeout(welcomeDismissTimer);
+  welcomeDismissTimer = setTimeout(() => {
+    welcomeCardEl.remove();
+    welcomeCardEl = null;
+  }, 300);
+}
+
+// ---------- Empty state prompt ----------
+const emptyStatePrompt = document.getElementById('empty-state-prompt');
+
+function showEmptyState() {
+  if (emptyStatePrompt) emptyStatePrompt.classList.remove('hidden');
+}
+
+function hideEmptyState() {
+  if (emptyStatePrompt) emptyStatePrompt.classList.add('hidden');
+}
 
 // Viewport-aware grid spawn: 2x4 on mobile, 4x2 on desktop (8 slots).
 function nextSpawnPosition() {
@@ -281,6 +320,11 @@ function makeCard(effectKey, opts = {}) {
     if (Math.hypot(e.clientX - cardDownX, e.clientY - cardDownY) > 20) {
       clearTimeout(cardLongPressTimer);
       cardLongPressTimer = null;
+      // Cancel gesture tooltip on drag.
+      if (card._gestureTooltipTimer) {
+        clearTimeout(card._gestureTooltipTimer);
+        card._gestureTooltipTimer = null;
+      }
     }
   }
   function onCardUp() {
@@ -318,12 +362,34 @@ function makeCard(effectKey, opts = {}) {
   // Track for capping.
   spawnedCards.push({ card, ft, effectKey });
 
+  // Hide empty state prompt when first card spawns.
+  if (spawnedCards.length === 1 && !isWelcomeVisible) {
+    hideEmptyState();
+  }
+
   // Mount animation.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       card.classList.add('mounted');
     });
   });
+
+  // Gesture tooltip (a5) — after mount animation rAF.
+  if (!WORD_EFFECTS.has(effectKey) && !sessionStorage.getItem('gia-gesture-hint-shown')) {
+    card._gestureTooltipTimer = setTimeout(() => {
+      if (card._gestureTooltipTimer === null) return; // cancelled
+      const tooltip = document.createElement('div');
+      tooltip.className = 'gesture-tooltip';
+      tooltip.textContent = 'Hold to change · Double-tap to close';
+      card.appendChild(tooltip);
+      sessionStorage.setItem('gia-gesture-hint-shown', '1');
+      // Auto-fade after 4s.
+      card._gestureFadeTimer = setTimeout(() => {
+        tooltip.classList.add('fading-out');
+        setTimeout(() => { tooltip.remove(); }, 400);
+      }, 4000);
+    }, 3000);
+  }
 
   // AI name toast.
   const aiName = generateName(effectKey, variantIdx);
@@ -372,6 +438,21 @@ function closeCard(card, ft) {
   const idx = spawnedCards.findIndex(c => c.card === card);
   if (idx >= 0) spawnedCards.splice(idx, 1);
 
+  // Show empty state prompt when last card is closed.
+  if (spawnedCards.length === 0) {
+    showEmptyState();
+  }
+
+  // Clean up gesture tooltip timers.
+  if (card._gestureTooltipTimer) {
+    clearTimeout(card._gestureTooltipTimer);
+    card._gestureTooltipTimer = null;
+  }
+  if (card._gestureFadeTimer) {
+    clearTimeout(card._gestureFadeTimer);
+    card._gestureFadeTimer = null;
+  }
+
   setTimeout(() => {
     try { card._instance && card._instance.destroy && card._instance.destroy(); } catch {}
     ft && ft.destroy();
@@ -390,6 +471,8 @@ tray.addEventListener('pointerdown', e => {
   const key = chip.dataset.effect;
   if (!key) return;
 
+  chip.classList.add('chip-tap-feedback');
+
   const timer = setTimeout(() => {
     if (EFFECT_VARIANTS[key]) {
       cycleChipVariant(key);
@@ -406,6 +489,7 @@ tray.addEventListener('pointerup', e => {
   if (!key) return;
   clearTimeout(chipLongPressTimers.get(key));
   chipLongPressTimers.delete(key);
+  chip.classList.remove('chip-tap-feedback');
 });
 
 tray.addEventListener('pointerleave', e => {
@@ -415,6 +499,7 @@ tray.addEventListener('pointerleave', e => {
   if (!key) return;
   clearTimeout(chipLongPressTimers.get(key));
   chipLongPressTimers.delete(key);
+  chip.classList.remove('chip-tap-feedback');
 });
 
 tray.addEventListener('click', e => {
@@ -422,6 +507,11 @@ tray.addEventListener('click', e => {
   if (!chip) return;
   const key = chip.dataset.effect;
   if (!key) return;
+
+  // Dismiss welcome card on any chip tap before normal action.
+  if (isWelcomeVisible) {
+    dismissWelcomeCard();
+  }
 
   // Handle special chips.
   if (key === 'symmetry-toggle') {
@@ -464,3 +554,22 @@ document.addEventListener('visibilitychange', () => {
 if (isDocumentVisible()) {
   // No-op — everything is already running.
 }
+
+// ---------- Usability overhaul: init ----------
+
+// Initialize welcome card.
+initWelcomeCard();
+
+// Show empty state prompt if welcome is dismissed and no cards.
+if (!isWelcomeVisible) {
+  showEmptyState();
+}
+
+// First chip pulse: add pulsing glow to Goo chip.
+const firstChip = document.querySelector('.chip[data-effect="fluid-goo"]');
+if (firstChip) firstChip.classList.add('chip-first-pulse');
+
+// Remove first-chip pulse on any chip click.
+tray.addEventListener('click', () => {
+  if (firstChip) firstChip.classList.remove('chip-first-pulse');
+});
