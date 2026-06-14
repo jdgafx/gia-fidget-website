@@ -87,6 +87,19 @@ const RADIAL_KEY_MAP = {
   'hope':    'never-give-up',
 };
 
+const EXPLOSION_PRESETS = {
+  'love-note':     'hearts',
+  'never-give-up': 'stars',
+  'soap-bubble':   'sparkles',
+  'glow-ripple':   'sparkles',
+  'petal-drift':   'confetti',
+  'fluid-goo':     'confetti',
+  'aurora-ribbon': 'sparkles',
+  'galaxy':        'stars',
+  'sand-pour':     'confetti',
+  'chill-3d':      'stars',
+};
+
 // ---------- Ambient background ----------
 
 const ambientCanvas = document.getElementById('ambient-canvas');
@@ -337,13 +350,14 @@ function createCardElement(effectKey, size, cx, cy, initRot, variantIdx, isPartn
     },
     onDoubleTap: () => explodeAndRemove(entity, ft),
     onExplosion: (speed) => {
-      createExplosion(entity, size / 2, size / 2, 'confetti', Math.min(speed / 8, 3));
+      const preset = EXPLOSION_PRESETS[effectKey] || 'confetti';
+      createExplosion(entity, size / 2, size / 2, preset, Math.min(speed / 8, 3));
       audioEngine.playNote(880, 0.45); // A5 sparkle
       
       const group = activeGroups.find(g => g.master === entity);
       if (group) {
         group.partners.forEach(partner => {
-          createExplosion(partner, size / 2, size / 2, 'confetti', Math.min(speed / 8, 3));
+          createExplosion(partner, size / 2, size / 2, preset, Math.min(speed / 8, 3));
         });
       }
     },

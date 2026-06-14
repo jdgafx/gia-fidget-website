@@ -318,12 +318,41 @@ body {
   will-change: transform;
   transform-origin: 50% 50%;
   perspective: 1200px;
-  transition: margin 0.3s ease-out;
+  border-radius: 36px;
+  background: rgba(12, 8, 24, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+  transition: border-color 0.35s, box-shadow 0.35s, filter 0.35s;
+}
+
+/* Circular style for organic/spherical effect elements */
+.effect-entity[data-effect="soap-bubble"],
+.effect-entity[data-effect="glow-ripple"],
+.effect-entity[data-effect="galaxy"] {
+  border-radius: 50%;
+}
+
+.effect-entity:hover {
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(167, 139, 250, 0.15),
+    inset 0 1px 1px rgba(255, 255, 255, 0.22);
 }
 
 .effect-entity.dragging {
   z-index: 100;
-  filter: drop-shadow(0 0 40px rgba(167, 139, 250, 0.4));
+  border-color: rgba(167, 139, 250, 0.55);
+  background: rgba(15, 10, 30, 0.45);
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.7),
+    0 0 50px rgba(167, 139, 250, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.32);
 }
 
 .effect-entity.orb-ripple {
@@ -331,8 +360,8 @@ body {
 }
 
 @keyframes orbRipple {
-  0% { filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.6)); }
-  100% { filter: none; }
+  0% { border-color: rgba(167, 139, 250, 0.85); box-shadow: 0 0 40px rgba(167, 139, 250, 0.5); }
+  100% { }
 }
 
 /* ---------- Empty state ---------- */
