@@ -463,3 +463,12 @@ window.addEventListener('keydown', (e) => {
     window.activeFidgetArtifact.zoom(0.92);
   }
 });
+
+// Global mouse wheel resizing for the active/hovered artifact
+window.addEventListener('wheel', (e) => {
+  if (!window.activeFidgetArtifact) return;
+  
+  e.preventDefault(); // Prevent page scroll
+  const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+  window.activeFidgetArtifact.zoom(zoomFactor);
+}, { passive: false });
