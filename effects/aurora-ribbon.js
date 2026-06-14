@@ -27,15 +27,18 @@ const VERT = /* glsl */`
     vSide = aSide;
     vec3 p = position;
 
-    // Two traveling sine waves combined for organic flow.
-    float t = uTime * 0.4;
-    float wave = sin(p.x * 1.8 + t) * 0.18
-               + sin(p.x * 3.1 - t * 0.7 + 1.3) * 0.08;
+    // Active pinwheel-spinning waves.
+    float t = uTime * 1.0;
+    float wave = sin(p.x * 2.0 + t) * 0.26
+               + sin(p.x * 3.6 - t * 0.8 + 1.3) * 0.14
+               + sin(p.x * 5.3 + t * 1.3) * 0.08
+               + sin(p.x * 8.0 - t * 1.7) * 0.04;
 
-    // Pointer bias — pushes the wave up where the pointer is.
+    // Pointer bias — pushes the wave up dramatically where the pointer is.
     float px = uPointer;
     float localX = p.x - px;
-    float push = exp(-localX * localX * 2.0) * 0.4;
+    // Tighter falloff + bigger amplitude = a clear wave bump under cursor.
+    float push = exp(-localX * localX * 1.0) * 0.7;
 
     p.z += wave + push;
 
@@ -164,7 +167,7 @@ export function mountAuroraRibbon(container) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
 
-    const damp = pointerDamp(dt, 0.6);
+    const damp = pointerDamp(dt, 0.3);
     uniforms.uPointer.value += (targetPointer - uniforms.uPointer.value) * damp;
     uniforms.uTime.value = t;
     uniforms.uAlpha.value = 0.85;

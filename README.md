@@ -23,6 +23,15 @@ calming psychology:
   (1440 px+) with the same components. Pointer Events unify touch, mouse, and pen.
 - **Performance.** DPR is capped at 1.5, RAF pauses when a card is offscreen or
   the tab is hidden, and `prefers-reduced-motion` makes everything quieter.
+- **Audio.** Soft paired-tone feedback (two detuned sines) on every interaction.
+  Ambient bed swells in passive mode. Mute state persists across sessions.
+- **Save gesture.** Two-finger long-press or shift+click captures any card to PNG.
+- **Symmetry.** Mirror mode (2/4/8) applies CSS transforms to canvas effects.
+- **Passive mode.** After 5s idle, cards dim and ambient slows. Audio swells.
+- **Variants.** Each effect has 4-6 named variants. Long-press chip or card to cycle.
+- **AI names.** Deterministic procedural naming (xorshift32) — same seed, same name.
+- **Zumies accent.** Neon glow on chip icons and title tag only — the core calm
+  aesthetic is untouched.
 
 ## Run locally
 
@@ -87,21 +96,40 @@ the repo in the Netlify dashboard.
 ├── netlify.toml            Static deploy config
 ├── ambient/
 │   └── background.js       Full-viewport FBM noise-warped fluid gradient
+├── audio/
+│   └── engine.js           WebAudio paired-tone feedback + ambient bed
 ├── effects/
 │   ├── fluid-goo.js        MiMo-inspired metaball blob
 │   ├── soap-bubble.js      Iridescent thin-film sphere
 │   ├── petal-drift.js      tsparticles slow-falling petals
 │   ├── aurora-ribbon.js    WebGL ribbon with traveling waves
 │   ├── galaxy.js           1500-particle galaxy, drag-to-spin
-│   └── glow-ripple.js      Tap-to-spawn soft rainbow ripples
+│   ├── glow-ripple.js      Tap-to-spawn soft rainbow ripples
+│   ├── sand-pour.js        GPU cellular-automata falling sand
+│   └── chill-3d.js         Three.js floating-island dreamscape
 └── lib/
     ├── palette.js          Hope palette + rainbow accent (≤70% sat)
     ├── easing.js           Breath-rhythm easings
     ├── dpr.js              Pixel ratio with `?dpr=2` override
     ├── reduced-motion.js   prefers-reduced-motion helper
     ├── visibility.js       RAF gating (IntersectionObserver + visibility)
-    └── draggable.js        Pointer-Events draggable wrapper
+    ├── symmetry-controller.js  Mirror mode state (off/2/4/8)
+    ├── save-gesture.js     Two-finger long-press / shift+click → PNG
+    ├── passive-mode.js     Idle-state dim + ambient slowdown
+    ├── ai-names.js         Deterministic procedural name generator
+    └── perf-monitor.js     Frame-time monitor + effect capper
 ```
+
+## Auto-deploy
+
+Every push to `master` automatically deploys to Netlify via a `post-push` git hook in `.git/hooks/post-push`. The hook reads `~/.netlifyrc` (mode 0600) for the auth token + site ID.
+
+To disable auto-deploy for a single push, use `git push --no-verify` (no — that bypasses other hooks) or temporarily rename the hook:
+```bash
+mv .git/hooks/post-push .git/hooks/post-push.disabled
+```
+
+Last verified deploy: see git log for the most recent master commit.
 
 ## Credits
 

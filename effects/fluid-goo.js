@@ -58,25 +58,34 @@ const FRAG = /* glsl */`
   void main() {
     vec2 uv = vUv * 2.0 - 1.0;
 
-    // Fluid displacement — soft, organic.
-    float n = fbm(uv * 1.4 + vec2(uTime * 0.07, -uTime * 0.05));
-    float r = length(uv) + (n - 0.5) * 0.30;
+    // Spin the whole cluster around its center, pinwheel-style.
+    float spin = uTime * 0.55;
+    vec2 ruv = vec2(
+      uv.x * cos(spin) - uv.y * sin(spin),
+      uv.x * sin(spin) + uv.y * cos(spin)
+    );
 
-    // Soft-min field — multiple blobs to give the goo look.
+    // Fluid displacement — soft, organic.
+    float n = fbm(ruv * 1.4 + vec2(uTime * 0.18, -uTime * 0.12));
+    float r = length(ruv) + (n - 0.5) * 0.30;
+
+    // Soft-min field — multiple blobs to give the goo look. Spinning.
     float blobs = 0.0;
-    for (int i = 0; i < 5; i++) {
-      float a = float(i) * 1.2566;       // 72° steps
-      float radius = 0.32 + 0.10 * sin(uTime * 0.5 + a);
-      vec2 c = vec2(cos(a + uTime * 0.2), sin(a + uTime * 0.18)) * 0.30;
+    for (int i = 0; i < 6; i++) {
+      float a = float(i) * 1.0472 + uTime * 0.55;  // 60° steps, fast spin
+      vec2 pOff = uPointerLocal * 0.35;
+      float radius = 0.30 + 0.14 * sin(uTime * 1.2 + a);
+      vec2 c = vec2(cos(a), sin(a)) * 0.38 + pOff;
       float d = length(uv - c) - radius;
-      blobs += 0.20 / (d * d * 30.0 + 0.1);
+      blobs += 0.20 / (d * d * 28.0 + 0.1);
     }
 
     float mask = smoothstep(0.55, 1.05, blobs + 0.6);
 
     // Pointer proximity brightens a hue band.
     float px = length(uv - uPointerLocal);
-    float prox = smoothstep(0.9, 0.0, px) * uPointerProx;
+    // Bigger, longer reach — the whole blob reacts to nearby cursor.
+    float prox = smoothstep(1.4, 0.0, px) * uPointerProx;
 
     // Vivid rainbow swirl — always alive, brighter on pointer proximity.
     // Spans the full hue wheel so the blob is always colorful.
@@ -188,13 +197,14 @@ export function mountFluidGoo(container) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime * (reduced ? 0.5 : 1.0);
 
-    const damp = pointerDamp(dt, 0.45);
+    // Faster pointer damping so the blob really chases the cursor.
+    const damp = pointerDamp(dt, 0.18);
     const cur = uniforms.uPointerLocal.value;
     cur.x += (target.x - cur.x) * damp;
     cur.y += (target.y - cur.y) * damp;
     uniforms.uPointerProx.value += (target.prox - uniforms.uPointerProx.value) * damp;
 
-    bloom *= Math.exp(-dt / 0.6);
+    bloom *= Math.exp(-dt / 0.4);
     uniforms.uBloom.value = bloom;
 
     uniforms.uTime.value = t;

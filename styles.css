@@ -90,8 +90,8 @@ body {
   height: 100dvh;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.55;
-  mix-blend-mode: screen;
+  opacity: 0.95;
+  mix-blend-mode: normal;
 }
 
 .vignette {
@@ -174,125 +174,68 @@ body {
   pointer-events: none;
 }
 
-/* ---------- Effect card ---------- */
+/* ---------- Effect (frosted-glass artifact) ---------- */
 
 .effect-card {
   position: absolute;
-  background: var(--glass);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  background: rgba(15, 10, 30, 0.25);
   border: 1px solid var(--border);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65),
+              0 0 20px -8px rgba(167, 139, 250, 0.15);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  overflow: visible;
+  display: block;
   pointer-events: auto;
   opacity: 0;
-  transform: scale(0.94) translateY(10px);
-  transition: opacity 480ms ease,
-              transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1),
-              box-shadow 600ms ease,
-              border-color 600ms ease;
+  transform: scale(0.7);
+  transition: opacity 600ms ease, transform 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
   will-change: transform, opacity;
   touch-action: none;
 }
 
 .effect-card.mounted {
   opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
-.effect-card:hover {
-  box-shadow: var(--shadow-hi);
-  border-color: var(--border-hi);
+  transform: scale(1);
 }
 
 .effect-card.closing {
   opacity: 0;
-  transform: scale(0.94) translateY(8px);
-  transition: opacity 360ms ease, transform 360ms ease;
+  transform: scale(0.6);
+  transition: opacity 400ms ease, transform 400ms ease;
 }
 
 .effect-handle {
-  height: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 0 18px;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.0));
-  border-bottom: 1px solid var(--border);
-}
-
-.effect-handle:active { cursor: grabbing; }
-
-.effect-handle-title {
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.20em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  pointer-events: none;
-  background: var(--rainbow);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: titleFlow 12s linear infinite;
+  display: none;
 }
 
 .effect-close {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
-  border-radius: 50%;
-  transition: background 200ms ease, color 200ms ease, transform 200ms ease;
-  font-family: inherit;
-  position: relative;
-  z-index: 2;
-  touch-action: manipulation;
-}
-
-.effect-close:hover,
-.effect-close:focus-visible {
-  background: rgba(255, 107, 157, 0.18);
-  color: var(--rose);
-  outline: none;
-  transform: scale(1.08);
-}
-
-.effect-close:active {
-  transform: scale(0.94);
+  display: none;
 }
 
 .effect-canvas {
-  flex: 1;
   position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(60% 50% at 30% 30%, rgba(167, 139, 250, 0.10), transparent 60%),
-    radial-gradient(60% 50% at 70% 70%, rgba(96, 165, 250, 0.08), transparent 60%),
-    var(--bg-1);
+  background: transparent;
   touch-action: none;
+  border-radius: var(--radius);
+  /* Subtle outer glow so the effect has presence on dark. */
+  filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.10))
+          drop-shadow(0 0 48px rgba(255, 107, 157, 0.06));
 }
 
 .effect-canvas canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  border-radius: var(--radius);
 }
+
+/* Word-chip cards (love, hope) — no special background needed.
+    The unified .effect-card chrome provides the frosted look. */
 
 /* ---------- Chip tray ---------- */
 
@@ -398,6 +341,132 @@ body {
   animation: titleFlow 10s linear infinite;
 }
 
+/* ---------- Controls hint (persistent bottom strip) ---------- */
+
+.controls-hint {
+  position: fixed;
+  z-index: 15;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  user-select: none;
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(15, 10, 30, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  opacity: 0;
+  animation: controlsHintFadeIn 800ms ease 400ms forwards;
+  white-space: nowrap;
+}
+
+@keyframes controlsHintFadeIn {
+  to { opacity: 1; }
+}
+
+.hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.hint-wheel { display: none; }
+
+@media (min-width: 768px) {
+  .hint-wheel { display: inline-flex; }
+}
+
+/* ---------- Neon glow (Zumies overlay — scoped to chip accents + title tag) ---------- */
+
+.neon-glow {
+  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor;
+}
+
+.chip-icon-svg {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+/* ---------- GIA tag below title ---------- */
+
+.gia-tag {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: clamp(10px, 2vw, 14px);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--violet);
+  text-shadow: 0 0 8px rgba(167, 139, 250, 0.6), 0 0 20px rgba(167, 139, 250, 0.3);
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+/* ---------- Passive mode ---------- */
+
+body.passive .effect-card {
+  opacity: 0.4 !important;
+  transition: opacity 600ms ease;
+}
+
+body.passive .vignette {
+  background: radial-gradient(140% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+/* ---------- Toast (variant / AI name overlay) ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 10, 30, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-hi);
+  color: var(--ink);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(16px, 4vw, 22px);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 0;
+  animation: toastIn 1.5s ease forwards;
+}
+
+@keyframes toastIn {
+  0%   { opacity: 0; transform: translate(-50%, -45%); }
+  15%  { opacity: 1; transform: translate(-50%, -50%); }
+  85%  { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -55%); }
+}
+
+/* ---------- Chip icon Zumies treatment ---------- */
+
+.chip-icon svg {
+  stroke-width: 2;
+}
+
+/* ---------- Chip toggle state ---------- */
+
+.chip-toggle.active {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+}
+
 /* ---------- Desktop layout tweaks ---------- */
 
 @media (min-width: 768px) {
@@ -430,6 +499,8 @@ body {
 
 .love-note {
   --speed: 1;
+  --mx: 0;
+  --my: 0;
   position: absolute;
   inset: 0;
   display: flex;
@@ -465,6 +536,16 @@ body {
   text-align: center;
   color: #ffeaf0;
   text-shadow: 0 0 16px rgba(255, 107, 157, 0.35);
+  transform: translate(calc(var(--mx) * 12px), calc(var(--my) * 8px))
+             rotate(calc(var(--ma, 0) * 6deg));
+  transition: transform 90ms linear;
+  animation: lovePhraseOrbit 6s ease-in-out infinite;
+  animation-duration: calc(6s / var(--speed));
+}
+
+@keyframes lovePhraseOrbit {
+  0%, 100% { letter-spacing: 0; }
+  50%      { letter-spacing: 0.06em; }
 }
 
 .love-word {
@@ -487,6 +568,17 @@ body {
   font-weight: 400;
   font-size: clamp(28px, 8vw, 48px);
   line-height: 1;
+  transform: translate(calc(var(--mx) * -16px), calc(var(--my) * -10px))
+             rotate(calc(var(--ma, 0) * -8deg));
+  transition: transform 90ms linear;
+  animation: loveSpin 4s linear infinite;
+  animation-duration: calc(4s / var(--speed));
+}
+
+@keyframes loveSpin {
+  0%   { letter-spacing: 0; }
+  50%  { letter-spacing: 8px; }
+  100% { letter-spacing: 0; }
 }
 
 .love-smiley {
@@ -594,6 +686,16 @@ body {
   line-height: 1.0;
   text-align: center;
   filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.25));
+  transform: translate(calc(var(--mx) * 14px), calc(var(--my) * 10px))
+             rotate(calc(var(--ma, 0) * 5deg));
+  transition: transform 90ms linear;
+  animation: ngSpin 5s ease-in-out infinite;
+  animation-duration: calc(5s / var(--speed));
+}
+
+@keyframes ngSpin {
+  0%, 100% { letter-spacing: 0; }
+  50%      { letter-spacing: 0.10em; }
 }
 
 .ng-line-1 { letter-spacing: 0.04em; }

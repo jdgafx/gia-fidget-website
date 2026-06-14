@@ -22,22 +22,34 @@ class Petal {
   reset(w, h, init = false) {
     this.x = Math.random() * w;
     this.y = init ? Math.random() * h : -10 - Math.random() * 40;
-    this.size = 4 + Math.random() * 8;
-    this.vy = 0.25 + Math.random() * 0.55;
-    this.vx = (Math.random() - 0.5) * 0.25;
+    this.size = 4 + Math.random() * 10;
+    // Faster fall so it feels alive.
+    this.vy = 0.5 + Math.random() * 1.1;
+    this.vx = (Math.random() - 0.5) * 0.5;
     this.rot = Math.random() * Math.PI * 2;
-    this.vrot = (Math.random() - 0.5) * 0.04;
+    this.vrot = (Math.random() - 0.5) * 0.07;
     this.swayPhase = Math.random() * Math.PI * 2;
-    this.swaySpeed = 0.4 + Math.random() * 0.5;
-    this.swayAmp = 0.4 + Math.random() * 0.6;
+    this.swaySpeed = 0.6 + Math.random() * 0.8;
+    this.swayAmp = 0.7 + Math.random() * 1.1;
     this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
     this.alpha = 0.6 + Math.random() * 0.35;
   }
   update(dt, t, w, h) {
+    // Swirl vortex — petals rotate around the center as they fall.
+    const cx = w / 2;
+    const cy = h / 2;
+    const dx = this.x - cx;
+    const dy = this.y - cy;
+    const r = Math.sqrt(dx * dx + dy * dy) || 1;
+    // Tangential force creates pinwheel spin.
+    const tangX = -dy / r;
+    const tangY = dx / r;
     // Sway
     const sway = Math.sin(t * this.swaySpeed + this.swayPhase) * this.swayAmp;
-    this.x += (this.vx + sway * 0.4) * dt * 60;
-    this.y += this.vy * dt * 60;
+    // Center pull gets weaker with radius (vortex profile).
+    const spinStrength = 0.018 * (1 - Math.min(1, r / Math.max(w, h)));
+    this.x += (tangX * spinStrength + this.vx + sway * 0.4) * dt * 60;
+    this.y += (tangY * spinStrength + this.vy) * dt * 60;
     this.rot += this.vrot * dt * 60;
     if (this.y > h + 20 || this.x < -20 || this.x > w + 20) this.reset(w, h);
   }
@@ -74,7 +86,7 @@ export function mountPetalDrift(container) {
 
   const ctx = canvas.getContext('2d');
   const reduced = prefersReducedMotion();
-  const COUNT = reduced ? 35 : 80;
+  const COUNT = reduced ? 50 : 160;
 
   const petals = [];
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -124,10 +136,10 @@ export function mountPetalDrift(container) {
     const w = canvas.width / dpr;
     const h = canvas.height / dpr;
 
-    // Soft repulsion from pointer (if inside).
+    // Soft repulsion from pointer (if inside) — bigger, stronger.
     let repel = null;
     if (ptr.inside) {
-      const radius = 90;
+      const radius = 140;
       repel = { x: ptr.x, y: ptr.y, r: radius, r2: radius * radius };
     }
 
